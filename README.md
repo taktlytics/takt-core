@@ -4,6 +4,7 @@
 
 
 > 📚 **Documentation** — [taktlytics.com/docs/wrappers/core](https://taktlytics.com/docs/wrappers/core)
+
 **Tiny, privacy-friendly analytics SDK for Takt.**
 
 [![npm version](https://img.shields.io/npm/v/@vskstudio/takt-core?color=2563eb&logo=npm)](https://www.npmjs.com/package/@vskstudio/takt-core)
