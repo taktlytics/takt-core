@@ -13,13 +13,13 @@
     "pageview",
     "takt"
   ],
-  "homepage": "https://github.com/vskstudio/takt-core#readme",
+  "homepage": "https://github.com/taktlytics/takt-core#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vskstudio/takt-core.git"
+    "url": "git+https://github.com/taktlytics/takt-core.git"
   },
   "bugs": {
-    "url": "https://github.com/vskstudio/takt-core/issues"
+    "url": "https://github.com/taktlytics/takt-core/issues"
   },
   "publishConfig": {
     "access": "public"
