@@ -1,10 +1,12 @@
 import { createTakt } from './createTakt'
 import type { Analytics, TrackOptions } from '../application/Analytics'
 import type { UrlScrubber } from '../domain/url/UrlScrubber'
+import type { RouteTemplateResolver } from '../domain/url/RouteRedaction'
 import { LocalStorageConsentStore } from '../infrastructure/consent/LocalStorageConsentStore'
 
 export { createTakt }
 export type { Config } from './createTakt'
+export type { RouteTemplateResolver } from '../domain/url/RouteRedaction'
 export type { TrackOptions } from '../application/Analytics'
 export type { Payload } from '../domain/event/Payload'
 
@@ -57,6 +59,9 @@ export interface InitOptions {
   trackQuery?: boolean
   queryParams?: string[]
   scrubUrl?: UrlScrubber
+  redactRoutes?: string[]
+  routeTemplates?: boolean
+  routeTemplate?: RouteTemplateResolver
   auto?: boolean
   outbound?: boolean
   files?: boolean
@@ -85,6 +90,9 @@ export function init(opts: InitOptions = {}): Analytics {
     trackQuery: opts.trackQuery,
     queryParams: opts.queryParams,
     scrubUrl: opts.scrubUrl,
+    redactRoutes: opts.redactRoutes,
+    routeTemplates: opts.routeTemplates,
+    routeTemplate: opts.routeTemplate,
   })
 
   if (opts.outbound) _disposers.push(_instance.enableOutbound())

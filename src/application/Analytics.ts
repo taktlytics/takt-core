@@ -5,6 +5,7 @@ import { AnalyticsEvent } from '../domain/event/AnalyticsEvent'
 import { buildPayload } from '../domain/event/Payload'
 import { TrackingPolicy } from './consent/TrackingPolicy'
 import type { UrlScrubber } from '../domain/url/UrlScrubber'
+import createRouteRedaction, { type RouteRedaction } from '../domain/url/RouteRedaction'
 import type { EventTransport } from './ports/EventTransport'
 import type { ConsentStore } from './ports/ConsentStore'
 import type { DoNotTrackProvider } from './ports/DoNotTrackProvider'
@@ -32,10 +33,12 @@ export interface AnalyticsConfig {
   debug: boolean
   sampleRate: number
   scrubUrl: UrlScrubber
+  routes?: RouteRedaction
 }
 
 export class Analytics {
   private readonly policy: TrackingPolicy
+  private readonly routes: RouteRedaction
 
   constructor(
     private readonly config: AnalyticsConfig,
@@ -47,6 +50,7 @@ export class Analytics {
     private readonly clickSource: ClickSource,
   ) {
     this.policy = new TrackingPolicy(consent, dnt, envProvider, config)
+    this.routes = config.routes ?? createRouteRedaction()
   }
 
   track(name: string, opts?: TrackOptions): void {
@@ -78,7 +82,22 @@ export class Analytics {
   }
 
   enableSpa(): () => void {
-    return new SpaPageviewTracker(this.navProvider, () => this.pageview()).enable()
+    if (!this.routes.templated) {
+      return new SpaPageviewTracker(this.navProvider, () => this.pageview()).enable()
+    }
+    const pending = new Set<ReturnType<typeof setTimeout>>()
+    const stop = new SpaPageviewTracker(this.navProvider, () => {
+      const timer = setTimeout(() => {
+        pending.delete(timer)
+        this.pageview()
+      }, 0)
+      pending.add(timer)
+    }).enable()
+    return () => {
+      stop()
+      pending.forEach(clearTimeout)
+      pending.clear()
+    }
   }
 
   enableOutbound(): () => void {
@@ -95,12 +114,12 @@ export class Analytics {
       this.clickSource,
       (name, opts) => this.track(name, opts),
       extensions,
-      this.config.scrubUrl,
+      (url) => this.config.scrubUrl(this.routes.link(url, this.envProvider.url())),
     ).enable()
   }
 
   enable404(): () => void {
-    return new NotFoundTracker((name, opts) => this.track(name, opts)).enable()
+    return new NotFoundTracker((name, opts) => this.track(name, opts), (path) => this.routes.path(path)).enable()
   }
 
   enableTagged(): () => void {
@@ -113,10 +132,11 @@ export class Analytics {
       ? Revenue.parse(opts.revenue.amount, opts.revenue.currency)
       : undefined
     const event = new AnalyticsEvent(name, new Props(opts?.props), revenue)
+    const pageUrl = this.envProvider.url()
     const payload = buildPayload(event, {
       domain: this.config.domain,
-      url: this.config.scrubUrl(this.envProvider.url()),
-      referrer: this.config.scrubUrl(this.envProvider.referrer()),
+      url: this.config.scrubUrl(this.routes.page(pageUrl)),
+      referrer: this.config.scrubUrl(this.routes.referrer(this.envProvider.referrer(), pageUrl)),
       width: this.envProvider.width(),
     })
     if (this.config.debug) console.debug('[takt] event', payload)

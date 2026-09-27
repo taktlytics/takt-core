@@ -33,6 +33,34 @@ describe('composition/index init()', () => {
     expect(body).toMatchObject({ n: 'pageview', d: 'example.com' })
   })
 
+  it('sends the matching redactRoutes pattern instead of the real path', () => {
+    window.history.replaceState({}, '', 'https://example.com/verify/abc123')
+    init({ domain: 'example.com', redactRoutes: ['/verify/[token]'] })
+    const body = JSON.parse((beaconMock.mock.calls[0] as [string, string])[1])
+    expect(body.u).toBe('https://example.com/verify/[token]')
+  })
+
+  it('sends the route template when routeTemplates is on', () => {
+    window.history.replaceState({}, '', 'https://example.com/users/42')
+    const instance = createTakt({ domain: 'example.com', routeTemplates: true, routeTemplate: () => '/users/:id' })
+    instance.pageview()
+    const body = JSON.parse((beaconMock.mock.calls[0] as [string, string])[1])
+    expect(body.u).toBe('https://example.com/users/:id')
+  })
+
+  it('warns in debug mode when routeTemplates has no resolver', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      createTakt({ domain: 'example.com', debug: true, routeTemplates: true })
+      expect(warn).toHaveBeenCalledOnce()
+      warn.mockClear()
+      createTakt({ domain: 'example.com', routeTemplates: true })
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   it('defaults the endpoint to the hosted Takt origin', () => {
     init({ domain: 'example.com', auto: true })
     expect((beaconMock.mock.calls[0] as [string, string])[0]).toBe('https://taktlytics.com/api/event')

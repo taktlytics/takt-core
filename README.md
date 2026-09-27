@@ -153,6 +153,9 @@ stopTagged()
 | `trackQuery` | `boolean` | `false` | Keep the full query string and hash on URLs |
 | `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
 | `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
+| `redactRoutes` | `string[]` | — | Route patterns whose real path is replaced by the pattern (e.g. `['/verify/[token]']` sends `/verify/[token]`). See [Route redaction](#route-redaction) |
+| `routeTemplates` | `boolean` | `false` | Send every URL as its route template instead of the real path. Needs a `routeTemplate` resolver; the framework wrappers provide one |
+| `routeTemplate` | `() => string \| null` | — | Returns the current route template (`/blog/[slug]`, `/users/:id`). Used when `routeTemplates` is on |
 
 ### Privacy
 
@@ -169,6 +172,22 @@ isOptedOut()  // true after optOut(), e.g. to render an opt-out toggle
 These three functions need no instance: call them before `init()` (a consent banner rendered first) and every instance created later honours the choice. An instance from `createTakt()` exposes the same `optOut()`, `optIn()`, and `isOptedOut()` methods over the same stored state.
 
 Events are suppressed, in order, when: the visitor has opted out, **or** Do Not Track is enabled (`respectDnt`), **or** the host is localhost / a private IP (`excludeLocalhost`), **or** the path matches an `exclude` prefix, **or** the event is dropped by `sampleRate`.
+
+### Route redaction
+
+Query strings are stripped by default, but path segments are sent as they are: `/verify/abc123` leaks the token. Two opt-in options replace real paths with route templates.
+
+```ts
+createTakt({ redactRoutes: ['/verify/[token]', '/reset/:code', '/invoices/[id].pdf'] })
+```
+
+`redactRoutes` lists the sensitive routes. A matching path is sent as the pattern (`/verify/[token]`), every other path keeps its real value, so per-page stats stay intact. Patterns accept SvelteKit / Astro / Next syntax (`[param]`, `[[optional]]`, `[...rest]`, `(group)`) and Vue / React / Angular / Solid syntax (`:param`, `:param?`, `*`, `**`). The rule covers the page URL, same-origin referrers, outbound and download link destinations, and 404 paths.
+
+```ts
+createTakt({ routeTemplates: true, routeTemplate: () => currentRoute.id })
+```
+
+`routeTemplates: true` sends every page as its route template: `/blog/hello` becomes `/blog/[slug]`. It suits fully private apps where no path is worth reading as is; on a public site it merges every article into one row. The core cannot know the router, so it needs a `routeTemplate` resolver, and the framework wrappers wire it for you. When a resolver returns nothing (no matched route), `redactRoutes` still applies and the real path is sent otherwise. Same-origin referrers are reduced to the site origin in this mode, since their template is unknown.
 
 ## Server-side events — `@vskstudio/takt-core/server`
 
@@ -200,6 +219,7 @@ await takt.event('Purchase', {
 | `apiKey` | `string` | — | Site API key with `events:write`, sent as `Authorization: Bearer` |
 | `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()` |
 | `trackQuery` / `queryParams` / `scrubUrl` | | query stripped | Same URL scrubbing as the browser SDK, applied to `url` and `referrer` |
+| `redactRoutes` | `string[]` | — | Same route patterns as the browser SDK. A `route` passed to `pageview()` / `event()` replaces the path of that call |
 | `strict` | `boolean` | `false` | Throw on network errors and non-`202` answers instead of swallowing them |
 | `fetch` | `typeof fetch` | global `fetch` | Custom fetch implementation (Node 18+ ships one) |
 

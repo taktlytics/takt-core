@@ -5,6 +5,7 @@ import { buildPayload, type Payload } from '../domain/event/Payload'
 import { Props } from '../domain/event/Props'
 import { Revenue } from '../domain/event/Revenue'
 import createUrlScrubber, { type UrlScrubber } from '../domain/url/UrlScrubber'
+import createRouteRedaction from '../domain/url/RouteRedaction'
 
 export interface ServerTaktOptions {
   domain: string
@@ -14,6 +15,7 @@ export interface ServerTaktOptions {
   trackQuery?: boolean
   queryParams?: string[]
   scrubUrl?: UrlScrubber
+  redactRoutes?: string[]
   strict?: boolean
   fetch?: typeof globalThis.fetch
 }
@@ -26,6 +28,7 @@ export interface ServerVisitor {
 export interface ServerPageviewOptions {
   url?: string
   referrer?: string
+  route?: string
   visitor?: ServerVisitor
 }
 
@@ -50,12 +53,20 @@ export function createServerTakt(options: ServerTaktOptions): ServerTakt {
     custom: options.scrubUrl,
   })
   const send = options.fetch ?? globalThis.fetch
+  const routes = createRouteRedaction({ redactRoutes: options.redactRoutes })
+
+  function routesFor(route: string | undefined) {
+    if (!route?.trim()) return routes
+    return createRouteRedaction({ redactRoutes: options.redactRoutes, routeTemplates: true, routeTemplate: () => route })
+  }
 
   async function post(event: AnalyticsEvent, opts: ServerPageviewOptions): Promise<void> {
+    const pageUrl = opts.url?.trim() || siteHomeUrl(domain)
+    const redaction = routesFor(opts.route)
     const payload = buildPayload(event, {
       domain,
-      url: scrub(opts.url?.trim() || siteHomeUrl(domain)),
-      referrer: opts.referrer ? scrub(opts.referrer) : '',
+      url: scrub(redaction.page(pageUrl)),
+      referrer: opts.referrer ? scrub(redaction.referrer(opts.referrer, pageUrl)) : '',
       width: 0,
     })
     try {
