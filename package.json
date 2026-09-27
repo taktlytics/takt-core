@@ -1,6 +1,6 @@
 {
   "name": "@vskstudio/takt-core",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Tiny privacy-friendly analytics SDK for Takt",
   "license": "MIT",
   "author": "VSK Studio",
