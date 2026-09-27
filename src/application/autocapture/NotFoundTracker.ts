@@ -9,7 +9,10 @@ type Emit = (name: string, opts?: { props?: Record<string, string> }) => void
  * Timing (`responseStatus`, recent Chromium) for true server 404s.
  */
 export class NotFoundTracker {
-  constructor(private readonly emit: Emit) {}
+  constructor(
+    private readonly emit: Emit,
+    private readonly redactPath: (path: string) => string = (path) => path,
+  ) {}
 
   enable(): () => void {
     if (typeof document === 'undefined') return () => {}
@@ -25,7 +28,7 @@ export class NotFoundTracker {
         /* Navigation Timing unavailable — rely on the marker only. */
       }
     }
-    if (is404) this.emit('404', { props: { path: location.pathname } })
+    if (is404) this.emit('404', { props: { path: this.redactPath(location.pathname) } })
 
     return () => {}
   }
