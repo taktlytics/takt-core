@@ -1,5 +1,11 @@
 # @vskstudio/takt-core
 
+## 0.9.0
+
+### Minor Changes
+
+- 9804074: `scrubUrl` now also rewrites the `url` prop of outbound-link and file-download events. `optOut()`, `optIn()` and the new `isOptedOut()` work without an instance, and instances expose `isOptedOut()`. New `@vskstudio/takt-core/server` entry with `createServerTakt()` for server-side pageviews and events.
+
 ## 0.8.1
 
 ### Patch Changes
