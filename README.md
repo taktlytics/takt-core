@@ -102,7 +102,7 @@ track('Signup', {
 })
 ```
 
-`init()` creates a single shared instance, fires an automatic pageview, and wires SPA navigation. `track`, `pageview`, `optOut`, and `optIn` delegate to it.
+`init()` creates a single shared instance, fires an automatic pageview, and wires SPA navigation. `track` and `pageview` delegate to it. `optOut`, `optIn`, and `isOptedOut` work with or without it (see [Privacy](#privacy)).
 
 Autocapture toggles — `outbound`, `files`, `notFound`, and `tagged` — opt into the same extensions as the snippet's `data-auto`: outbound-link clicks, file downloads, 404 detection, and `data-takt-event` custom events. `tagged: true` tracks clicks on elements carrying `data-takt-event` (with `data-takt-prop-*` becoming props), matching `data-auto=tagged`.
 
@@ -152,20 +152,58 @@ stopTagged()
 | `exclude` | `string[]` | — | Path prefixes never tracked (e.g. `['/app', '/account']`). Segment-bounded: `/app` matches `/app` and `/app/…` but not `/application`. Checked at send time, so it holds across SPA navigation |
 | `trackQuery` | `boolean` | `false` | Keep the full query string and hash on URLs |
 | `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
-| `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams` |
+| `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
 
 ### Privacy
 
 By default the query string and hash are stripped from every URL (page, referrer, and autocaptured link destinations) before sending — secrets in `?token=…` or `#access_token=…` never leave the browser. Opt back in with `trackQuery: true`, narrow it with a `queryParams` allowlist, or take full control with `scrubUrl`. Props and revenue are sanitized too: props are coerced to strings, capped (30 keys, 64-char keys, 1024-char values), and revenue is dropped unless the amount and 3-letter currency are well-formed.
 
 ```ts
-import { optOut, optIn } from '@vskstudio/takt-core'
+import { optOut, optIn, isOptedOut } from '@vskstudio/takt-core'
 
-optOut() // sets localStorage `takt_ignore` = '1'; no events are sent
-optIn()  // resumes tracking
+optOut()      // sets localStorage `takt_ignore` = '1'; no events are sent
+optIn()       // resumes tracking
+isOptedOut()  // true after optOut(), e.g. to render an opt-out toggle
 ```
 
+These three functions need no instance: call them before `init()` (a consent banner rendered first) and every instance created later honours the choice. An instance from `createTakt()` exposes the same `optOut()`, `optIn()`, and `isOptedOut()` methods over the same stored state.
+
 Events are suppressed, in order, when: the visitor has opted out, **or** Do Not Track is enabled (`respectDnt`), **or** the host is localhost / a private IP (`excludeLocalhost`), **or** the path matches an `exclude` prefix, **or** the event is dropped by `sampleRate`.
+
+## Server-side events — `@vskstudio/takt-core/server`
+
+Send pageviews and events from Node (visitors without JavaScript, crawlers, webhooks, queued jobs) with the same payload rules as the browser SDK:
+
+```ts
+import { createServerTakt } from '@vskstudio/takt-core/server'
+
+const takt = createServerTakt({
+  domain: 'example.com',
+  apiKey: process.env.TAKT_API_KEY,
+})
+
+await takt.pageview({
+  url: 'https://example.com/pricing',
+  referrer: request.headers.get('referer') ?? undefined,
+  visitor: { ip: clientIp, userAgent: request.headers.get('user-agent') ?? undefined },
+})
+
+await takt.event('Purchase', {
+  props: { plan: 'pro' },
+  revenue: { amount: '29.00', currency: 'EUR' },
+})
+```
+
+| Option | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `domain` | `string` | required | Site identifier, must match the site of the API key |
+| `apiKey` | `string` | — | Site API key with `events:write`, sent as `Authorization: Bearer` |
+| `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()` |
+| `trackQuery` / `queryParams` / `scrubUrl` | | query stripped | Same URL scrubbing as the browser SDK, applied to `url` and `referrer` |
+| `strict` | `boolean` | `false` | Throw on network errors and non-`202` answers instead of swallowing them |
+| `fetch` | `typeof fetch` | global `fetch` | Custom fetch implementation (Node 18+ ships one) |
+
+Without a `url`, the event is attached to the site home (`https://{domain}/`), since the ingest rejects events without an absolute URL. `visitor.ip` is sent as `X-Forwarded-For` and `visitor.userAgent` as `User-Agent`.
 
 ## Widgets & public stats
 
