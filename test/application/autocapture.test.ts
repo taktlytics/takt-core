@@ -165,3 +165,24 @@ describe('TaggedEventTracker', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+describe('autocapture URL scrubbing', () => {
+  const redactTokens = (raw: string) => raw.replace(/\/verify\/[^/]+/, '/verify/:token')
+
+  it('OutboundLinkTracker passes props.url through the scrubber', () => {
+    const { source, trigger } = fakeClick()
+    const calls: [string, TrackOptions?][] = []
+    new OutboundLinkTracker(source, fakeEnv('example.com'), (n, o) => calls.push([n, o]), redactTokens).enable()
+    trigger(link('https://other.com/verify/abc123?x=1'))
+    expect(calls[0][1]?.props?.url).toBe('https://other.com/verify/:token')
+  })
+
+  it('FileDownloadTracker passes props.url through the scrubber', () => {
+    const { source, trigger } = fakeClick()
+    const calls: [string, TrackOptions?][] = []
+    new FileDownloadTracker(source, (n, o) => calls.push([n, o]), ['pdf'], redactTokens).enable()
+    trigger(link('https://example.com/verify/abc123/report.pdf'))
+    expect(calls[0][1]?.props?.url).toBe('https://example.com/verify/:token/report.pdf')
+    expect(calls[0][1]?.props?.extension).toBe('pdf')
+  })
+})

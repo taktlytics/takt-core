@@ -154,6 +154,52 @@ describe('Analytics', () => {
     })
   })
 
+  describe('isOptedOut()', () => {
+    it('reflects the consent store', () => {
+      const consent = fakeConsent()
+      const { analytics } = makeAnalytics({ consent })
+      expect(analytics.isOptedOut()).toBe(false)
+      analytics.optOut()
+      expect(analytics.isOptedOut()).toBe(true)
+      analytics.optIn()
+      expect(analytics.isOptedOut()).toBe(false)
+    })
+  })
+
+  describe('custom scrubUrl on autocapture', () => {
+    function makeWithScrubber(click: ClickSource, transport: EventTransport) {
+      return new Analytics(
+        { ...defaultConfig, scrubUrl: createUrlScrubber({ custom: (raw) => raw.replace(/\/invite\/[^/]+/, '/invite/:code') }) },
+        transport,
+        fakeConsent(),
+        fakeDnt(),
+        fakeEnv(),
+        fakeNav().nav,
+        click,
+      )
+    }
+
+    it('scrubs the outbound link url', () => {
+      const { click, trigger } = fakeClick()
+      const { transport, calls } = fakeTransport()
+      makeWithScrubber(click, transport).enableOutbound()
+      const a = document.createElement('a')
+      a.href = 'https://discord.gg/invite/s3cr3t'
+      trigger(a)
+      expect(calls[0].p?.url).toBe('https://discord.gg/invite/:code')
+    })
+
+    it('scrubs the file download url', () => {
+      const { click, trigger } = fakeClick()
+      const { transport, calls } = fakeTransport()
+      makeWithScrubber(click, transport).enableFiles(['pdf'])
+      const a = document.createElement('a')
+      a.href = 'https://example.com/invite/s3cr3t/file.pdf'
+      trigger(a)
+      expect(calls[0].p?.url).toBe('https://example.com/invite/:code/file.pdf')
+    })
+  })
+
   describe('enableSpa()', () => {
     it('fires pageview on navigation and disposer stops it', () => {
       const { nav, trigger } = fakeNav()

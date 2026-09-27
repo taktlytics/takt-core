@@ -73,13 +73,20 @@ export class Analytics {
     this.consent.optIn()
   }
 
+  isOptedOut(): boolean {
+    return this.consent.isOptedOut()
+  }
+
   enableSpa(): () => void {
     return new SpaPageviewTracker(this.navProvider, () => this.pageview()).enable()
   }
 
   enableOutbound(): () => void {
-    return new OutboundLinkTracker(this.clickSource, this.envProvider, (name, opts) =>
-      this.track(name, opts),
+    return new OutboundLinkTracker(
+      this.clickSource,
+      this.envProvider,
+      (name, opts) => this.track(name, opts),
+      this.config.scrubUrl,
     ).enable()
   }
 
@@ -88,6 +95,7 @@ export class Analytics {
       this.clickSource,
       (name, opts) => this.track(name, opts),
       extensions,
+      this.config.scrubUrl,
     ).enable()
   }
 
