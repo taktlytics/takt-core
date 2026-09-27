@@ -203,7 +203,7 @@ await takt.event('Purchase', {
 | `strict` | `boolean` | `false` | Throw on network errors and non-`202` answers instead of swallowing them |
 | `fetch` | `typeof fetch` | global `fetch` | Custom fetch implementation (Node 18+ ships one) |
 
-Without a `url`, the event is attached to the site home (`https://{domain}/`), since the ingest rejects events without an absolute URL. `visitor.ip` is sent as `X-Forwarded-For` and `visitor.userAgent` as `User-Agent`.
+Without a `url`, the event is attached to the site home (`https://{domain}/`), since the ingest rejects events without an absolute URL. `visitor.ip` is sent as `X-Forwarded-For` and `visitor.userAgent` as `User-Agent`. The ingest does not use the forwarded IP on the server path yet: the visitor and country are still derived from the calling server's IP, and only the User-Agent is honoured.
 
 ## Widgets & public stats
 
