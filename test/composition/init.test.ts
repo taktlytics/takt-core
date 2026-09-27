@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { init, track, pageview, optOut, optIn, _reset } from '../../src/composition/index'
+import { init, track, pageview, optOut, optIn, isOptedOut, createTakt, _reset } from '../../src/composition/index'
 import type { Config, TrackOptions, Revenue, Payload } from '../../src/composition/index'
 
 // compile-time check: public types are exported
@@ -80,6 +80,29 @@ describe('composition/index init()', () => {
     optIn()
     track('Signup')
     expect(beaconMock).toHaveBeenCalledOnce()
+  })
+
+  it('optOut() before init() persists and blocks the later instance', () => {
+    optOut()
+    expect(isOptedOut()).toBe(true)
+    init({ domain: 'example.com', auto: true })
+    expect(beaconMock).not.toHaveBeenCalled()
+  })
+
+  it('isOptedOut() reflects optOut()/optIn() without any instance', () => {
+    expect(isOptedOut()).toBe(false)
+    optOut()
+    expect(isOptedOut()).toBe(true)
+    optIn()
+    expect(isOptedOut()).toBe(false)
+  })
+
+  it('module consent functions and createTakt instances share the same state', () => {
+    const instance = createTakt({ domain: 'example.com' })
+    optOut()
+    expect(instance.isOptedOut()).toBe(true)
+    instance.optIn()
+    expect(isOptedOut()).toBe(false)
   })
 
   it('track/pageview are no-ops when not init-ed', () => {

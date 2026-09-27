@@ -1,6 +1,7 @@
 import { createTakt } from './createTakt'
 import type { Analytics, TrackOptions } from '../application/Analytics'
 import type { UrlScrubber } from '../domain/url/UrlScrubber'
+import { LocalStorageConsentStore } from '../infrastructure/consent/LocalStorageConsentStore'
 
 export { createTakt }
 export type { Config } from './createTakt'
@@ -36,6 +37,8 @@ export type {
 } from '../stats/client'
 
 export type Revenue = { amount: string; currency: string }
+
+const visitorConsent = new LocalStorageConsentStore()
 
 let _instance: Analytics | null = null
 let _disposers: Array<() => void> = []
@@ -106,14 +109,16 @@ export function pageview(): void {
   _instance?.pageview()
 }
 
-/** Opt the visitor out of tracking (persisted). No-op until {@link init} has run. */
 export function optOut(): void {
-  _instance?.optOut()
+  visitorConsent.optOut()
 }
 
-/** Reverse a previous {@link optOut}. No-op until {@link init} has run. */
 export function optIn(): void {
-  _instance?.optIn()
+  visitorConsent.optIn()
+}
+
+export function isOptedOut(): boolean {
+  return visitorConsent.isOptedOut()
 }
 
 export function _reset(): void {
