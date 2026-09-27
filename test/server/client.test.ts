@@ -44,6 +44,27 @@ describe('createServerTakt', () => {
     expect(sentBody(calls[0]).u).toBe('https://example.com/')
   })
 
+  it('sends the matching redactRoutes pattern for the url and a same-origin referrer', async () => {
+    const { fetch, calls } = fakeFetch()
+    await createServerTakt({ domain: 'example.com', redactRoutes: ['/verify/:token'], fetch }).pageview({
+      url: 'https://example.com/verify/abc?x=1',
+      referrer: 'https://example.com/verify/def',
+    })
+    expect(sentBody(calls[0])).toMatchObject({
+      u: 'https://example.com/verify/:token',
+      r: 'https://example.com/verify/:token',
+    })
+  })
+
+  it('uses the route given with the call as the path', async () => {
+    const { fetch, calls } = fakeFetch()
+    await createServerTakt({ domain: 'example.com', fetch }).event('Paid', {
+      url: 'https://example.com/orders/991',
+      route: '/orders/:id',
+    })
+    expect(sentBody(calls[0]).u).toBe('https://example.com/orders/:id')
+  })
+
   it('sends the api key and visitor headers', async () => {
     const { fetch, calls } = fakeFetch()
     await createServerTakt({ domain: 'example.com', apiKey: 'tk_live_abc', fetch }).pageview({
