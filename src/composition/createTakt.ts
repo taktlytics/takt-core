@@ -7,6 +7,8 @@ import { WindowEnvironmentProvider } from '../infrastructure/browser/WindowEnvir
 import { HistoryNavigationProvider } from '../infrastructure/browser/HistoryNavigationProvider'
 import { DocumentClickSource } from '../infrastructure/browser/DocumentClickSource'
 import createUrlScrubber, { type UrlScrubber } from '../domain/url/UrlScrubber'
+import createRouteRedaction, { type RouteTemplateResolver } from '../domain/url/RouteRedaction'
+import { warnOnce } from '../domain/util/warn'
 import { DEFAULT_TAKT_ORIGIN } from '../defaults'
 
 /** Configuration for {@link createTakt} — the core SDK without the autocapture toggles. */
@@ -23,6 +25,9 @@ export interface Config {
   trackQuery?: boolean
   queryParams?: string[]
   scrubUrl?: UrlScrubber
+  redactRoutes?: string[]
+  routeTemplates?: boolean
+  routeTemplate?: RouteTemplateResolver
 }
 
 /**
@@ -56,6 +61,15 @@ export function createTakt(config: Config = {}): Analytics {
       queryParams: config.queryParams,
       custom: config.scrubUrl,
     }),
+    routes: createRouteRedaction({
+      redactRoutes: config.redactRoutes,
+      routeTemplates: config.routeTemplates,
+      routeTemplate: config.routeTemplate,
+    }),
+  }
+
+  if (resolvedConfig.debug && config.routeTemplates && typeof config.routeTemplate !== 'function') {
+    warnOnce('routeTemplates is on but no routeTemplate resolver was given, so real paths are sent')
   }
 
   return new Analytics(
