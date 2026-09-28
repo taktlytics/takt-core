@@ -119,7 +119,19 @@ export class Analytics {
   }
 
   enable404(): () => void {
-    return new NotFoundTracker((name, opts) => this.track(name, opts), (path) => this.routes.path(path)).enable()
+    return new NotFoundTracker(
+      (name, opts) => this.track(name, opts),
+      (path) => this.scrubPath(this.routes.path(path)),
+    ).enable()
+  }
+
+  private scrubPath(path: string): string {
+    try {
+      const origin = new URL(this.envProvider.url()).origin
+      return new URL(this.config.scrubUrl(origin + path), origin).pathname
+    } catch {
+      return path
+    }
   }
 
   enableTagged(): () => void {
