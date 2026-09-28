@@ -199,6 +199,22 @@ describe('Analytics', () => {
       trigger(a)
       expect(calls[0].p?.url).toBe('https://example.com/invite/:code/file.pdf')
     })
+
+    it('scrubs the path of a 404 event', () => {
+      const marker = document.createElement('div')
+      marker.setAttribute('data-takt-404', '')
+      document.body.appendChild(marker)
+      const previous = location.pathname
+      history.replaceState(null, '', '/invite/s3cr3t')
+      try {
+        const { transport, calls } = fakeTransport()
+        makeWithScrubber(fakeClick().click, transport).enable404()
+        expect(calls[0]).toMatchObject({ n: '404', p: { path: '/invite/:code' } })
+      } finally {
+        marker.remove()
+        history.replaceState(null, '', previous)
+      }
+    })
   })
 
   describe('enableSpa()', () => {

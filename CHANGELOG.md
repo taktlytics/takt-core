@@ -1,5 +1,11 @@
 # @vskstudio/takt-core
 
+## 0.10.1
+
+### Patch Changes
+
+- `enable404()` and the `notFound` option now pass the `path` prop through `scrubUrl` after `redactRoutes`, like the outbound-link and file-download events. A custom scrubber is applied to the 404 path.
+
 ## 0.10.0
 
 ### Minor Changes
