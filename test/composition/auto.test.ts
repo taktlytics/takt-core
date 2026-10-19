@@ -248,6 +248,21 @@ describe('runAuto', () => {
     expect(pageviews()).toHaveLength(1)
   })
 
+  it('does not treat a pre-existing window.takt with an m property as an installation', () => {
+    const pageWindow = window as { takt?: unknown }
+    pageWindow.takt = { m: () => null }
+    runSnippet(scriptEl({ 'data-domain': 'auto.test' }))
+    expect(pageviews()).toHaveLength(1)
+  })
+
+  it('installs over a foreign function that has no takt_mask', () => {
+    const pageWindow = window as { takt?: unknown }
+    pageWindow.takt = function foreign() {}
+    runSnippet(scriptEl({ 'data-domain': 'auto.test' }))
+    expect(pageviews()).toHaveLength(1)
+    expect(typeof (pageWindow.takt as { takt_mask?: unknown }).takt_mask).toBe('function')
+  })
+
   function pageviews(): Array<Record<string, unknown>> {
     return bodies().filter((b) => b.n === 'pageview')
   }

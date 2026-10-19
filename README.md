@@ -17,7 +17,7 @@
 ---
 
 - **Zero dependencies**, tree-shakeable ESM module.
-- **~1 kB gzip** drop-in snippet — no build step required.
+- **~1 kB gzip** drop-in snippet. No build step required.
 - **Privacy first**: honours opt-out and Do Not Track, strips query strings, and excludes localhost / private IPs by default.
 - **Hexagonal core**: a pure domain wrapped in ports & adapters — easy to test, easy to extend.
 
@@ -57,7 +57,7 @@ Calls made before the script finishes loading are queued and replayed — instal
 | `data-track-query` | Keep the full query string and hash (default strips both) | stripped |
 | `data-query-params="utm_source,utm_medium"` | Keep only these query params | none |
 
-The base snippet stays around **1 kB gzip**: pageviews, SPA navigation, `window.takt()`, and the privacy guards — nothing more. It respects Do Not Track and strips the query string and hash from URLs by default; the attributes above tune both. For a custom scrubber function, use the npm build (`scrubUrl` below).
+The base snippet stays around **1 kB gzip**: pageviews, SPA navigation, `window.takt()`, and the privacy guards: nothing more. It respects Do Not Track and strips the query string and hash from URLs by default; the attributes above tune both. For a custom scrubber function, use the npm build (`scrubUrl` below).
 
 The base snippet has neither `exclude` nor `redactRoutes`: its pageviews send the real path of every page, including `/verify/abc123`. Use the npm SDK when a route must never reach analytics. Browsers that send `Sec-GPC: 1` (Global Privacy Control) are still honoured: the ingest drops their events.
 
