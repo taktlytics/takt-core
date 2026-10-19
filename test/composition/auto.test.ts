@@ -13,12 +13,26 @@ function clickLink(href: string): void {
   const link = document.createElement('a')
   link.href = href
   document.body.appendChild(link)
-  link.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  link.addEventListener('click', (e) => e.preventDefault())
+  link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   link.remove()
+}
+
+const pristineHistory = {
+  pushState: history.pushState,
+  replaceState: history.replaceState,
+}
+
+type RecordedListener = {
+  target: EventTarget
+  type: string
+  listener: EventListenerOrEventListenerObject
+  options?: boolean | AddEventListenerOptions
 }
 
 describe('runAuto', () => {
   let beaconMock: ReturnType<typeof vi.fn>
+  let recorded: RecordedListener[] = []
 
   beforeEach(() => {
     localStorage.clear()
@@ -26,9 +40,24 @@ describe('runAuto', () => {
     beaconMock = vi.fn(() => true)
     vi.stubGlobal('navigator', { sendBeacon: beaconMock, doNotTrack: '0' })
     delete (window as { takt?: unknown }).takt
+    recorded = []
+    const original = EventTarget.prototype.addEventListener
+    vi.spyOn(EventTarget.prototype, 'addEventListener').mockImplementation(function (
+      this: EventTarget,
+      ...args: Parameters<EventTarget['addEventListener']>
+    ) {
+      const [type, listener, options] = args
+      if ((this === document || this === window) && listener) recorded.push({ target: this, type, listener, options })
+      original.apply(this, args)
+    })
   })
 
   afterEach(() => {
+    for (const r of recorded) r.target.removeEventListener(r.type, r.listener, r.options)
+    recorded = []
+    history.pushState = pristineHistory.pushState
+    history.replaceState = pristineHistory.replaceState
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
     delete (window as { takt?: unknown }).takt
   })
@@ -141,15 +170,32 @@ describe('runAuto', () => {
     window.history.replaceState({}, '', 'https://example.com/reset/SECRET-TOKEN?next=1')
     beaconMock.mockClear()
     try {
-      runAuto(scriptEl({ 'data-domain': 'leak.test', 'data-auto': 'outbound,downloads', 'data-redact-routes': '/reset/[token]' }))
+      runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'outbound,downloads', 'data-redact-routes': '/reset/[token]' }))
       clickLink('https://partner.io/verify/abc?token=SECRET-TOKEN')
       clickLink('https://example.com/files/report.pdf?token=SECRET-TOKEN')
-      const own = bodies().filter((b) => b.d === 'leak.test')
-      expect(own).toContainEqual(expect.objectContaining({ n: 'pageview', u: 'https://example.com/reset/[token]' }))
-      expect(own.length).toBeGreaterThanOrEqual(3)
-      expect(JSON.stringify(own)).not.toContain('SECRET-TOKEN')
+      expect(bodies()).toContainEqual(expect.objectContaining({ n: 'pageview', u: 'https://example.com/reset/[token]' }))
+      expect(bodies().length).toBeGreaterThanOrEqual(3)
+      expect(JSON.stringify(beaconMock.mock.calls)).not.toContain('SECRET-TOKEN')
     } finally {
       window.history.replaceState({}, '', 'https://example.com/')
     }
+  })
+
+  it('masks the pageview of SPA navigation to a redacted route', () => {
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-redact-routes': '/reset/[token]' }))
+    beaconMock.mockClear()
+    window.history.pushState({}, '', '/reset/SECRET-TOKEN?next=1')
+    window.history.replaceState({}, '', '/reset/SECRET-TOKEN#step')
+    expect(bodies()).toContainEqual(expect.objectContaining({ n: 'pageview', u: 'https://example.com/reset/[token]' }))
+    expect(JSON.stringify(beaconMock.mock.calls)).not.toContain('SECRET-TOKEN')
+  })
+
+  it('ignores a second call on the same page so events are not sent twice', () => {
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'outbound' }))
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'outbound' }))
+    expect(bodies().filter((b) => b.n === 'pageview')).toHaveLength(1)
+    beaconMock.mockClear()
+    clickLink('https://other.com/path')
+    expect(beaconMock).toHaveBeenCalledTimes(1)
   })
 })
