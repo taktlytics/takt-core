@@ -230,6 +230,24 @@ describe('runAuto', () => {
     expect(JSON.stringify(beaconMock.mock.calls)).not.toContain('SECRET-TOKEN')
   })
 
+  it('fails closed when the mask returns nothing: the route is not sent', () => {
+    window.history.replaceState({}, '', 'https://example.com/reset/SECRET-TOKEN')
+    try {
+      runSnippet(scriptEl({ 'data-domain': 'auto.test' }), () => null as unknown as string)
+      expect(pageviews()).toContainEqual(expect.objectContaining({ u: '' }))
+      expect(JSON.stringify(beaconMock.mock.calls)).not.toContain('SECRET-TOKEN')
+    } finally {
+      window.history.replaceState({}, '', 'https://example.com/')
+    }
+  })
+
+  it('does not treat a pre-existing window.takt object as an installation', () => {
+    const pageWindow = window as { takt?: unknown }
+    pageWindow.takt = { takt_mask: () => null }
+    runSnippet(scriptEl({ 'data-domain': 'auto.test' }))
+    expect(pageviews()).toHaveLength(1)
+  })
+
   function pageviews(): Array<Record<string, unknown>> {
     return bodies().filter((b) => b.n === 'pageview')
   }

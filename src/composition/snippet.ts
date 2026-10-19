@@ -1,7 +1,7 @@
 import { DEFAULT_TAKT_ORIGIN } from '../defaults'
 
 type Mask = (raw: string) => string
-type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][]; m?: Mask }
+type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][]; takt_mask?: Mask }
 type Opts = { props?: Record<string, string>; revenue?: { amount: string; currency: string } } | undefined
 
 // runSnippet is exported for testing; the IIFE tail below auto-runs it in the browser.
@@ -12,8 +12,8 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
   if (get('data-enabled') === 'false') return
 
   const win = window as unknown as { takt?: TaktFn }
-  if (win.takt?.m) {
-    if (redact) win.takt.m = redact
+  if (typeof win.takt === 'function' && win.takt.takt_mask) {
+    if (redact) win.takt.takt_mask = redact
     return
   }
 
@@ -33,7 +33,7 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
   // + hash) wins over the allowlist, which wins over the default strip — mirrors
   // createUrlScrubber.
   const scrub = (raw: string) => {
-    const masked = win.takt?.m?.(raw) ?? raw
+    const masked = fn.takt_mask!(raw) || ''
     try {
       if (keepQuery) return masked
       const u = new URL(masked)
@@ -91,7 +91,7 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
 
   const q = win.takt?.q
   const fn = track as TaktFn
-  fn.m = redact ?? ((raw: string) => raw)
+  fn.takt_mask = redact || ((raw: string) => raw)
   win.takt = fn
   pv()
   if (q) for (const a of q) track(...(a as [string, Opts?]))
