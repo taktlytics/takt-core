@@ -105,8 +105,13 @@ export class Analytics {
       this.clickSource,
       this.envProvider,
       (name, opts) => this.track(name, opts),
-      this.config.scrubUrl,
+      (destination) => this.config.scrubUrl(this.redactDestination(destination)),
     ).enable()
+  }
+
+  private redactDestination(destination: string): string {
+    const url = new URL(destination)
+    return url.origin + this.routes.pattern(url.pathname)
   }
 
   enableFiles(extensions?: string[]): () => void {

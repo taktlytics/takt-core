@@ -12,6 +12,7 @@ export interface RouteRedaction {
   link(rawUrl: string, pageUrl: string): string
   referrer(rawUrl: string, pageUrl: string): string
   path(pathname: string): string
+  pattern(pathname: string): string
 }
 
 const GROUP = /^\(.+\)$/
@@ -129,6 +130,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
       if (templated) return url.origin + '/'
       return routes.length ? rewrite(rawUrl, null) : rawUrl
     },
-    path: (pathname) => redactedPath(pathname) ?? pathname,
+    path: (pathname) => currentTemplate() ?? redactedPath(pathname) ?? pathname,
+    pattern: (pathname) => redactedPath(pathname) ?? pathname,
   }
 }
