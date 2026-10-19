@@ -1,3 +1,5 @@
+import decodePathSegments from './decodePathSegments'
+
 export type RouteTemplateResolver = () => string | null | undefined
 
 export interface RouteRedactionOptions {
@@ -70,14 +72,6 @@ function withPath(url: URL, path: string): string {
   return url.origin + path + url.search + url.hash
 }
 
-function safeDecode(path: string): string {
-  try {
-    return decodeURI(path)
-  } catch {
-    return path
-  }
-}
-
 export default function createRouteRedaction(options: RouteRedactionOptions = {}): RouteRedaction {
   const routes = (options.redactRoutes ?? [])
     .map((pattern) => pattern.trim())
@@ -87,7 +81,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
   const templated = typeof resolver === 'function'
 
   function redactedPath(pathname: string): string | null {
-    const decoded = safeDecode(pathname)
+    const decoded = decodePathSegments(pathname)
     for (const route of routes) {
       if (route.regex.test(pathname) || route.regex.test(decoded)) return route.output
     }

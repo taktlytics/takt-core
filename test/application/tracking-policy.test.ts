@@ -167,10 +167,26 @@ describe('TrackingPolicy.isBlocked()', () => {
     expect(policy.isBlocked()).toBe(true)
   })
 
-  it('keeps an undecodable path as is instead of throwing', () => {
+  it('still decodes the other segments when one segment is malformed', () => {
     const policy = new TrackingPolicy(
-      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%E0%A4%A/app'),
-      cfg({ exclude: ['/app'] }),
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%61dmin/%ZZ'),
+      cfg({ exclude: ['/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('matches a malformed segment of the path against the same segment of the entry', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%ZZ/%61dmin'),
+      cfg({ exclude: ['/%ZZ/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('keeps the segment-bounded prefix rule after a malformed segment', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%ZZ/%61dmin'),
+      cfg({ exclude: ['/admin'] }),
     )
     expect(policy.isBlocked()).toBe(false)
   })

@@ -1,6 +1,7 @@
 import type { ConsentStore } from '../ports/ConsentStore'
 import type { DoNotTrackProvider } from '../ports/DoNotTrackProvider'
 import type { EnvironmentProvider } from '../ports/EnvironmentProvider'
+import decodePathSegments from '../../domain/url/decodePathSegments'
 
 export interface TrackingPolicyConfig {
   respectDnt: boolean
@@ -12,16 +13,8 @@ export interface TrackingPolicyConfig {
   sampleRate: number
 }
 
-function decodePath(path: string): string {
-  try {
-    return decodeURIComponent(path)
-  } catch {
-    return path
-  }
-}
-
 function normalizeSegmentPath(path: string): string {
-  return decodePath(path).replace(/\/+$/, '').toLowerCase()
+  return decodePathSegments(path).replace(/\/+$/, '').toLowerCase()
 }
 
 // Frozen short-circuit order: opt-out → DNT → localhost → exclude → sampling.
