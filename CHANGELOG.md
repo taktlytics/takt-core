@@ -1,5 +1,11 @@
 # @vskstudio/takt-core
 
+## 0.11.1
+
+### Patch Changes
+
+- ab7a798: Private helpers of the tracker instance follow the underscore convention, so tools that list the public surface of an instance no longer see them.
+
 ## 0.11.0
 
 ### Minor Changes
