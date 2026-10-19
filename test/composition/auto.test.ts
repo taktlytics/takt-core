@@ -129,4 +129,27 @@ describe('runAuto', () => {
     clickLink('https://example.com/invoices/991.pdf')
     expect(bodies()).toContainEqual(expect.objectContaining({ n: 'File Download', p: { url: 'https://example.com/invoices/[id]' } }))
   })
+
+  it('redacts download paths of files hosted on another domain with data-redact-routes', () => {
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'downloads', 'data-redact-routes': '/invoices/[id]' }))
+    beaconMock.mockClear()
+    clickLink('https://cdn.partner.io/invoices/991.pdf?sig=abc')
+    expect(bodies()).toContainEqual(expect.objectContaining({ n: 'File Download', p: { url: 'https://cdn.partner.io/invoices/[id]' } }))
+  })
+
+  it('sends the redacted pageview path and no beacon carries the secret path segment', () => {
+    window.history.replaceState({}, '', 'https://example.com/reset/SECRET-TOKEN?next=1')
+    beaconMock.mockClear()
+    try {
+      runAuto(scriptEl({ 'data-domain': 'leak.test', 'data-auto': 'outbound,downloads', 'data-redact-routes': '/reset/[token]' }))
+      clickLink('https://partner.io/verify/abc?token=SECRET-TOKEN')
+      clickLink('https://example.com/files/report.pdf?token=SECRET-TOKEN')
+      const own = bodies().filter((b) => b.d === 'leak.test')
+      expect(own).toContainEqual(expect.objectContaining({ n: 'pageview', u: 'https://example.com/reset/[token]' }))
+      expect(own.length).toBeGreaterThanOrEqual(3)
+      expect(JSON.stringify(own)).not.toContain('SECRET-TOKEN')
+    } finally {
+      window.history.replaceState({}, '', 'https://example.com/')
+    }
+  })
 })

@@ -16,8 +16,9 @@ const DEFAULT_EXT = 'pdf,xlsx,docx,pptx,csv,zip,gz,rar,7z,dmg,exe,apk,mp3,mp4,wa
 // window.takt posé par runSnippet, donc opt-out / DNT / exclusion localhost
 // s'appliquent uniformément ; le nom réservé « pageview » y est déjà refusé.
 export function runAuto(el: HTMLScriptElement | null): void {
-  runSnippet(el)
   const get = (k: string) => (el ? el.getAttribute(k) : null)
+  const routes = createRouteRedaction({ redactRoutes: (get('data-redact-routes') || '').split(',') })
+  runSnippet(el, routes.page)
   const takt = (window as unknown as { takt?: TaktFn }).takt
   if (!takt) return
 
@@ -26,7 +27,6 @@ export function runAuto(el: HTMLScriptElement | null): void {
   const outbound = on('outbound')
   const downloads = on('downloads')
   const tagged = on('tagged')
-  const routes = createRouteRedaction({ redactRoutes: (get('data-redact-routes') || '').split(',') })
 
   if (outbound || downloads || tagged) {
     const exts = (get('data-downloads-ext') || DEFAULT_EXT)
@@ -49,12 +49,12 @@ export function runAuto(el: HTMLScriptElement | null): void {
         let url: URL
         try { url = new URL(a.href) } catch { return }
         if (url.protocol !== 'http:' && url.protocol !== 'https:') return
-        const dest = url.origin + url.pathname
+        const destination = url.origin + routes.pattern(url.pathname)
         if (outbound && url.hostname !== location.hostname) {
-          takt('Outbound Link: Click', { props: { url: url.origin + routes.pattern(url.pathname) } })
+          takt('Outbound Link: Click', { props: { url: destination } })
         }
         if (downloads && fileRe.test(url.pathname.toLowerCase())) {
-          takt('File Download', { props: { url: routes.link(dest, location.href) } })
+          takt('File Download', { props: { url: destination } })
         }
       },
       true,

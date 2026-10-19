@@ -119,7 +119,7 @@ export class Analytics {
       this.clickSource,
       (name, opts) => this.track(name, opts),
       extensions,
-      (url) => this.config.scrubUrl(this.routes.link(url, this.envProvider.url())),
+      (destination) => this.config.scrubUrl(this.redactDestination(destination)),
     ).enable()
   }
 

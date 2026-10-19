@@ -4,7 +4,7 @@ type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][] }
 type Opts = { props?: Record<string, string>; revenue?: { amount: string; currency: string } } | undefined
 
 // runSnippet is exported for testing; the IIFE tail below auto-runs it in the browser.
-export function runSnippet(el: HTMLScriptElement | null): void {
+export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) => string): void {
   const get = (k: string) => (el ? el.getAttribute(k) : null)
 
   // data-enabled="false" : kill-switch total (aucun listener, aucun envoi).
@@ -26,9 +26,10 @@ export function runSnippet(el: HTMLScriptElement | null): void {
   // + hash) wins over the allowlist, which wins over the default strip — mirrors
   // createUrlScrubber.
   const scrub = (raw: string) => {
-    if (keepQuery) return raw
+    const masked = redact ? redact(raw) : raw
+    if (keepQuery) return masked
     try {
-      const u = new URL(raw)
+      const u = new URL(masked)
       if (allow.length) {
         const kept = new URLSearchParams()
         for (const n of allow) { const v = u.searchParams.get(n); if (v !== null) kept.set(n, v) }
@@ -36,7 +37,7 @@ export function runSnippet(el: HTMLScriptElement | null): void {
         return u.origin + u.pathname + (qs ? '?' + qs : '')
       }
       return u.origin + u.pathname
-    } catch { return raw }
+    } catch { return masked }
   }
 
   // Frozen short-circuit order: opt-out → DNT → localhost → sampling.
