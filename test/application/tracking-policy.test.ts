@@ -143,6 +143,62 @@ describe('TrackingPolicy.isBlocked()', () => {
     expect(policy.isBlocked()).toBe(true)
   })
 
+  it('matches regardless of case on the path or the entry', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/App/Sites'),
+      cfg({ exclude: ['/APP'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('matches the percent-decoded path against the exclude entry', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%61dmin/users'),
+      cfg({ exclude: ['/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('matches a percent-encoded exclude entry against the decoded path', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/café/x'),
+      cfg({ exclude: ['/caf%C3%A9'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('still decodes the other segments when one segment is malformed', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%61dmin/%ZZ'),
+      cfg({ exclude: ['/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('matches a malformed segment of the path against the same segment of the entry', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%ZZ/%61dmin'),
+      cfg({ exclude: ['/%ZZ/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('keeps the segment-bounded prefix rule after a malformed segment', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%ZZ/%61dmin'),
+      cfg({ exclude: ['/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(false)
+  })
+
+  it('matches a trailing slash on the path itself', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/app/'),
+      cfg({ exclude: ['/app'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
   it('drops empty entries so a stray "" never blanket-blocks every path', () => {
     const policy = new TrackingPolicy(
       fakeConsent(), fakeDnt(), fakeEnv('example.com', '/pricing'),

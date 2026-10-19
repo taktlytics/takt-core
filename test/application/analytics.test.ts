@@ -382,6 +382,90 @@ describe('Analytics', () => {
       expect(calls).toHaveLength(1)
     })
 
+    it('redacts the download path of a file link on any host', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ redactRoutes: ['/invoices/[id]'] }),
+        envAt('/account'),
+        { click },
+      )
+      analytics.enableFiles(['pdf'])
+      const a = document.createElement('a')
+      a.href = 'https://cdn.partner.io/invoices/991.pdf?sig=abc'
+      trigger(a)
+      expect(calls[0]).toMatchObject({ n: 'File Download', p: { url: 'https://cdn.partner.io/invoices/[id]' } })
+    })
+
+    it('redacts the destination path of an outbound link on any host', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ redactRoutes: ['/verify/[token]'] }),
+        envAt('/account'),
+        { click },
+      )
+      analytics.enableOutbound()
+      const a = document.createElement('a')
+      a.href = 'https://partner.io/verify/abc123?x=1'
+      trigger(a)
+      expect(calls[0].p?.url).toBe('https://partner.io/verify/[token]')
+    })
+
+    it('keeps the outbound destination pattern-only in template mode', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/users/[id]' }),
+        envAt('/users/42'),
+        { click },
+      )
+      analytics.enableOutbound()
+      const a = document.createElement('a')
+      a.href = 'https://partner.io/users/42'
+      trigger(a)
+      expect(calls[0].p?.url).toBe('https://partner.io/users/42')
+    })
+
+    it('redacts the path of a 404 event with the route template of the page', () => {
+      const marker = document.createElement('div')
+      marker.setAttribute('data-takt-404', '')
+      document.body.appendChild(marker)
+      const previous = location.pathname
+      history.replaceState(null, '', '/invite/s3cr3t')
+      try {
+        const { analytics, calls } = makeWithRoutes(
+          createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/invite/[code]' }),
+          envAt('/invite/s3cr3t'),
+        )
+        analytics.enable404()
+        expect(calls[0]).toMatchObject({ n: '404', p: { path: '/invite/[code]' } })
+      } finally {
+        marker.remove()
+        history.replaceState(null, '', previous)
+      }
+    })
+
+    it('falls back to the redactRoutes pattern on a 404 when the resolver returns nothing', () => {
+      const marker = document.createElement('div')
+      marker.setAttribute('data-takt-404', '')
+      document.body.appendChild(marker)
+      const previous = location.pathname
+      history.replaceState(null, '', '/verify/abc123')
+      try {
+        const { analytics, calls } = makeWithRoutes(
+          createRouteRedaction({
+            redactRoutes: ['/verify/[token]'],
+            routeTemplates: true,
+            routeTemplate: () => null,
+          }),
+          envAt('/verify/abc123'),
+        )
+        analytics.enable404()
+        expect(calls[0]).toMatchObject({ n: '404', p: { path: '/verify/[token]' } })
+      } finally {
+        marker.remove()
+        history.replaceState(null, '', previous)
+      }
+    })
+
     it('redacts the path of a 404 event', () => {
       const marker = document.createElement('div')
       marker.setAttribute('data-takt-404', '')

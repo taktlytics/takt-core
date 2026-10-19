@@ -1,8 +1,11 @@
 import { runSnippet } from './snippet'
 import { readTaggedEvent } from '../domain/event/tagged'
+import createRouteRedaction from '../domain/url/RouteRedaction'
+import { NotFoundTracker } from '../application/autocapture/NotFoundTracker'
 
 type Props = Record<string, string>
 type TaktFn = (name: string, opts?: { props?: Props }) => void
+type AutoTakt = TaktFn & { auto?: true }
 
 // Liste d'extensions de fichiers considérées comme téléchargements (surchargée
 // par data-downloads-ext). Volontairement large : documents, archives, médias.
@@ -14,10 +17,13 @@ const DEFAULT_EXT = 'pdf,xlsx,docx,pptx,csv,zip,gz,rar,7z,dmg,exe,apk,mp3,mp4,wa
 // window.takt posé par runSnippet, donc opt-out / DNT / exclusion localhost
 // s'appliquent uniformément ; le nom réservé « pageview » y est déjà refusé.
 export function runAuto(el: HTMLScriptElement | null): void {
-  runSnippet(el)
+  if ((window as unknown as { takt?: AutoTakt }).takt?.auto) return
   const get = (k: string) => (el ? el.getAttribute(k) : null)
-  const takt = (window as unknown as { takt?: TaktFn }).takt
+  const routes = createRouteRedaction({ redactRoutes: (get('data-redact-routes') || '').split(',') })
+  runSnippet(el, routes.page)
+  const takt = (window as unknown as { takt?: AutoTakt }).takt
   if (!takt) return
+  takt.auto = true
 
   const auto = (get('data-auto') || '').split(',').map((s) => s.trim()).filter(Boolean)
   const on = (k: string) => auto.includes(k)
@@ -46,27 +52,19 @@ export function runAuto(el: HTMLScriptElement | null): void {
         let url: URL
         try { url = new URL(a.href) } catch { return }
         if (url.protocol !== 'http:' && url.protocol !== 'https:') return
-        const dest = url.origin + url.pathname
-        if (outbound && url.hostname !== location.hostname) takt('Outbound Link: Click', { props: { url: dest } })
-        if (downloads && fileRe.test(url.pathname.toLowerCase())) takt('File Download', { props: { url: dest } })
+        const destination = url.origin + routes.pattern(url.pathname)
+        if (outbound && url.hostname !== location.hostname) {
+          takt('Outbound Link: Click', { props: { url: destination } })
+        }
+        if (downloads && fileRe.test(url.pathname.toLowerCase())) {
+          takt('File Download', { props: { url: destination } })
+        }
       },
       true,
     )
   }
 
-  if (on('404')) {
-    // Détection hybride : marqueur explicite (page d'erreur servie en 200) ou
-    // vrai code HTTP via Navigation Timing (Chrome/Edge récents). Une seule fois.
-    let is404 = !!document.querySelector('[data-takt-404],meta[name="takt:404"]')
-    if (!is404) {
-      try {
-        const nav = performance.getEntriesByType('navigation')[0] as
-          (PerformanceNavigationTiming & { responseStatus?: number }) | undefined
-        if (nav?.responseStatus === 404) is404 = true
-      } catch { /* noop */ }
-    }
-    if (is404) takt('404', { props: { path: location.pathname } })
-  }
+  if (on('404')) new NotFoundTracker(takt, routes.path).enable()
 }
 
 if (typeof document !== 'undefined') {

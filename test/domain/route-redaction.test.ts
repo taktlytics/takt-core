@@ -132,4 +132,11 @@ describe('createRouteRedaction', () => {
     expect(routes.referrer('https://example.com/a', PAGE)).toBe('https://example.com/a')
     expect(routes.path('/a/b')).toBe('/a/b')
   })
+
+  it('matches a route on an encoded slash and on a malformed segment next to it', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/invoices/[id]'] })
+    expect(routes.pattern('/invoices%2F991')).toBe('/invoices/[id]')
+    expect(routes.pattern('/%ZZ/invoices/991')).toBe('/%ZZ/invoices/991')
+    expect(routes.pattern('/invoices/%ZZ')).toBe('/invoices/[id]')
+  })
 })

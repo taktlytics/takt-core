@@ -1,14 +1,21 @@
 import { DEFAULT_TAKT_ORIGIN } from '../defaults'
 
-type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][] }
+type Mask = (raw: string) => string
+type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][]; takt_mask?: Mask }
 type Opts = { props?: Record<string, string>; revenue?: { amount: string; currency: string } } | undefined
 
 // runSnippet is exported for testing; the IIFE tail below auto-runs it in the browser.
-export function runSnippet(el: HTMLScriptElement | null): void {
+export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) => string): void {
   const get = (k: string) => (el ? el.getAttribute(k) : null)
 
   // data-enabled="false" : kill-switch total (aucun listener, aucun envoi).
   if (get('data-enabled') === 'false') return
+
+  const win = window as unknown as { takt?: TaktFn }
+  if (typeof win.takt === 'function' && win.takt.takt_mask) {
+    if (redact) win.takt.takt_mask = redact
+    return
+  }
 
   const domain = get('data-domain') || location.hostname
   // data-script-origin (first-party / anti-adblock) : origine d'où Takt sert
@@ -26,9 +33,10 @@ export function runSnippet(el: HTMLScriptElement | null): void {
   // + hash) wins over the allowlist, which wins over the default strip — mirrors
   // createUrlScrubber.
   const scrub = (raw: string) => {
-    if (keepQuery) return raw
     try {
-      const u = new URL(raw)
+      const masked = win.takt?.takt_mask?.(raw) || ''
+      if (keepQuery) return masked
+      const u = new URL(masked)
       if (allow.length) {
         const kept = new URLSearchParams()
         for (const n of allow) { const v = u.searchParams.get(n); if (v !== null) kept.set(n, v) }
@@ -36,17 +44,12 @@ export function runSnippet(el: HTMLScriptElement | null): void {
         return u.origin + u.pathname + (qs ? '?' + qs : '')
       }
       return u.origin + u.pathname
-    } catch { return raw }
+    } catch { return '' }
   }
 
   // Frozen short-circuit order: opt-out → DNT → localhost → sampling.
   function emit(name: string, opts?: Opts): void {
     try { if (localStorage.getItem('takt_ignore') === '1') return } catch { /* noop */ }
-    // Standard DNT value only. The full SDK also honors the legacy DNT 'yes'
-    // (old Firefox/Safari), Global Privacy Control (navigator.globalPrivacyControl),
-    // and path exclusion (`exclude` in init()); all are omitted from this minimal
-    // snippet to stay within the ≤ 1 kB budget. GPC stays enforced: GPC browsers
-    // auto-send the Sec-GPC header on the beacon, which the ingest drops.
     if (dnt && navigator.doNotTrack === '1') return
     if (excl) {
       const h = location.hostname
@@ -80,10 +83,11 @@ export function runSnippet(el: HTMLScriptElement | null): void {
   }
   addEventListener('popstate', pv)
   addEventListener('hashchange', pv)
-  pv()
 
-  const win = window as unknown as { takt?: TaktFn }
   const q = win.takt?.q
-  win.takt = track as TaktFn
+  const fn = track as TaktFn
+  fn.takt_mask = redact || ((raw: string) => raw)
+  win.takt = fn
+  pv()
   if (q) for (const a of q) track(...(a as [string, Opts?]))
 }

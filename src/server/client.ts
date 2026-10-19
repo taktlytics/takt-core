@@ -47,6 +47,7 @@ export function createServerTakt(options: ServerTaktOptions): ServerTakt {
   if (!domain) throw new Error('createServerTakt: domain is required')
 
   const collectUrl = resolveEndpoint(options.endpoint, options.scriptOrigin)
+  assertTransportSecure(collectUrl)
   const scrub = createUrlScrubber({
     trackQuery: options.trackQuery,
     queryParams: options.queryParams,
@@ -91,6 +92,22 @@ export function createServerTakt(options: ServerTaktOptions): ServerTakt {
       const revenue = opts.revenue ? Revenue.parse(opts.revenue.amount, opts.revenue.currency) : undefined
       await post(new AnalyticsEvent(eventName, new Props(opts.props), revenue), opts)
     },
+  }
+}
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+function assertTransportSecure(endpoint: string): void {
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    return
+  }
+  if (url.protocol === 'http:' && !LOOPBACK_HOSTS.has(url.hostname)) {
+    throw new Error(
+      `createServerTakt: endpoint ${url.origin} must use https (http is only accepted for localhost, 127.0.0.1 and [::1])`,
+    )
   }
 }
 
