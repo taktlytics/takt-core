@@ -143,6 +143,22 @@ describe('TrackingPolicy.isBlocked()', () => {
     expect(policy.isBlocked()).toBe(true)
   })
 
+  it('matches regardless of case on the path or the entry', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/App/Sites'),
+      cfg({ exclude: ['/APP'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('matches a trailing slash on the path itself', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/app/'),
+      cfg({ exclude: ['/app'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
   it('drops empty entries so a stray "" never blanket-blocks every path', () => {
     const policy = new TrackingPolicy(
       fakeConsent(), fakeDnt(), fakeEnv('example.com', '/pricing'),

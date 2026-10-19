@@ -14,8 +14,6 @@ export interface TrackingPolicyConfig {
 
 // Frozen short-circuit order: opt-out → DNT → localhost → exclude → sampling.
 export class TrackingPolicy {
-  // Normalized once: trailing slashes stripped and empty entries dropped, so
-  // '/app/' still matches '/app' and a stray '' can never blanket-block every path.
   private readonly exclude: string[]
 
   constructor(
@@ -25,7 +23,7 @@ export class TrackingPolicy {
     private readonly config: TrackingPolicyConfig,
     private readonly random: () => number = Math.random,
   ) {
-    this.exclude = config.exclude.map((s) => s.replace(/\/+$/, '')).filter(Boolean)
+    this.exclude = config.exclude.map((s) => s.replace(/\/+$/, '').toLowerCase()).filter(Boolean)
   }
 
   isBlocked(): boolean {
@@ -38,8 +36,9 @@ export class TrackingPolicy {
   }
 
   private isExcludedPath(path: string): boolean {
+    const normalized = path.replace(/\/+$/, '').toLowerCase()
     for (const pre of this.exclude) {
-      if (path === pre || path.startsWith(pre + '/')) return true
+      if (normalized === pre || normalized.startsWith(pre + '/')) return true
     }
     return false
   }
