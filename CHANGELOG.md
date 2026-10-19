@@ -1,5 +1,11 @@
 # @vskstudio/takt-core
 
+## 0.11.2
+
+### Patch Changes
+
+- Published to npm through Trusted Publishing (OIDC) instead of a long-lived token. No runtime change.
+
 ## 0.11.1
 
 ### Patch Changes
