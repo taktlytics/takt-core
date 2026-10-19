@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { runAuto } from '../../src/composition/auto'
+import { runSnippet } from '../../src/composition/snippet'
 
 function scriptEl(attrs: Record<string, string | null> = {}): HTMLScriptElement {
   const s = document.createElement('script')
@@ -198,4 +199,38 @@ describe('runAuto', () => {
     clickLink('https://other.com/path')
     expect(beaconMock).toHaveBeenCalledTimes(1)
   })
+
+  it('base then auto sends one pageview at load and one per navigation', () => {
+    runSnippet(scriptEl({ 'data-domain': 'auto.test' }))
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'outbound' }))
+    expect(pageviews()).toHaveLength(1)
+    window.history.pushState({}, '', '/next')
+    expect(pageviews()).toHaveLength(2)
+    window.history.replaceState({}, '', '/later')
+    expect(pageviews()).toHaveLength(3)
+    beaconMock.mockClear()
+    clickLink('https://other.com/path')
+    expect(bodies().filter((b) => b.n === 'Outbound Link: Click')).toHaveLength(1)
+  })
+
+  it('auto then base sends one pageview at load and one per navigation', () => {
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'outbound' }))
+    runSnippet(scriptEl({ 'data-domain': 'auto.test' }))
+    expect(pageviews()).toHaveLength(1)
+    window.history.pushState({}, '', '/next')
+    expect(pageviews()).toHaveLength(2)
+  })
+
+  it('base then auto masks navigation to a redacted route', () => {
+    runSnippet(scriptEl({ 'data-domain': 'auto.test' }))
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-redact-routes': '/reset/[token]' }))
+    beaconMock.mockClear()
+    window.history.pushState({}, '', '/reset/SECRET-TOKEN')
+    expect(pageviews()).toContainEqual(expect.objectContaining({ u: 'https://example.com/reset/[token]' }))
+    expect(JSON.stringify(beaconMock.mock.calls)).not.toContain('SECRET-TOKEN')
+  })
+
+  function pageviews(): Array<Record<string, unknown>> {
+    return bodies().filter((b) => b.n === 'pageview')
+  }
 })

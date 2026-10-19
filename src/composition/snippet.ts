@@ -1,6 +1,7 @@
 import { DEFAULT_TAKT_ORIGIN } from '../defaults'
 
-type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][] }
+type Mask = (raw: string) => string
+type TaktFn = ((name: string, opts?: unknown) => void) & { q?: unknown[][]; m?: Mask }
 type Opts = { props?: Record<string, string>; revenue?: { amount: string; currency: string } } | undefined
 
 // runSnippet is exported for testing; the IIFE tail below auto-runs it in the browser.
@@ -9,6 +10,12 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
 
   // data-enabled="false" : kill-switch total (aucun listener, aucun envoi).
   if (get('data-enabled') === 'false') return
+
+  const win = window as unknown as { takt?: TaktFn }
+  if (win.takt?.m) {
+    if (redact) win.takt.m = redact
+    return
+  }
 
   const domain = get('data-domain') || location.hostname
   // data-script-origin (first-party / anti-adblock) : origine d'où Takt sert
@@ -26,7 +33,7 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
   // + hash) wins over the allowlist, which wins over the default strip — mirrors
   // createUrlScrubber.
   const scrub = (raw: string) => {
-    if (redact) raw = redact(raw)
+    raw = win.takt?.m?.(raw) ?? raw
     try {
       if (keepQuery) return raw
       const u = new URL(raw)
@@ -81,10 +88,11 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
   }
   addEventListener('popstate', pv)
   addEventListener('hashchange', pv)
-  pv()
 
-  const win = window as unknown as { takt?: TaktFn }
   const q = win.takt?.q
-  win.takt = track as TaktFn
+  const fn = track as TaktFn
+  fn.m = redact ?? ((raw: string) => raw)
+  win.takt = fn
+  pv()
   if (q) for (const a of q) track(...(a as [string, Opts?]))
 }
