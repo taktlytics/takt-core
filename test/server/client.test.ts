@@ -38,6 +38,21 @@ describe('createServerTakt', () => {
     expect(b.calls[0].url).toBe('https://stats.example.com/api/event')
   })
 
+  it('refuses a plain http endpoint outside loopback at construction', () => {
+    const { fetch } = fakeFetch()
+    expect(() => createServerTakt({ domain: 'example.com', endpoint: 'http://takt-api:8080/api/event', fetch }))
+      .toThrow('must use https')
+    expect(() => createServerTakt({ domain: 'example.com', scriptOrigin: 'http://10.0.0.5', fetch }))
+      .toThrow('must use https')
+  })
+
+  it('accepts http on localhost, 127.0.0.1 and [::1]', () => {
+    const { fetch } = fakeFetch()
+    for (const endpoint of ['http://localhost:8080/api/event', 'http://127.0.0.1:8080/api/event', 'http://[::1]:8080/api/event']) {
+      expect(() => createServerTakt({ domain: 'example.com', endpoint, fetch })).not.toThrow()
+    }
+  })
+
   it('falls back to the site home when no url is given', async () => {
     const { fetch, calls } = fakeFetch()
     await createServerTakt({ domain: 'example.com', fetch }).event('Signup')
