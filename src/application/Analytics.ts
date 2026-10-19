@@ -105,11 +105,11 @@ export class Analytics {
       this.clickSource,
       this.envProvider,
       (name, opts) => this.track(name, opts),
-      (destination) => this.config.scrubUrl(this.redactDestination(destination)),
+      (destination) => this.config.scrubUrl(this._redactDestination(destination)),
     ).enable()
   }
 
-  private redactDestination(destination: string): string {
+  private _redactDestination(destination: string): string {
     const url = new URL(destination)
     return url.origin + this.routes.pattern(url.pathname)
   }
@@ -119,18 +119,18 @@ export class Analytics {
       this.clickSource,
       (name, opts) => this.track(name, opts),
       extensions,
-      (destination) => this.config.scrubUrl(this.redactDestination(destination)),
+      (destination) => this.config.scrubUrl(this._redactDestination(destination)),
     ).enable()
   }
 
   enable404(): () => void {
     return new NotFoundTracker(
       (name, opts) => this.track(name, opts),
-      (path) => this.scrubPath(this.routes.path(path)),
+      (path) => this._scrubPath(this.routes.path(path)),
     ).enable()
   }
 
-  private scrubPath(path: string): string {
+  private _scrubPath(path: string): string {
     try {
       const origin = new URL(this.envProvider.url()).origin
       return new URL(this.config.scrubUrl(origin + path), origin).pathname
