@@ -22,7 +22,8 @@
     "url": "https://github.com/taktlytics/takt-core/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
