@@ -72,7 +72,7 @@ Need outbound clicks, file downloads, HTML-declared events, or 404 detection wit
   data-auto="outbound,downloads,tagged,404"></script>
 ```
 
-Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extension is opt-in.
+Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extension is opt-in. The bundle is idempotent: a second `takt.auto.js` on the same page is ignored, so clicks and SPA pageviews are never sent twice.
 
 | `data-auto` value | Event sent | Property |
 | --- | --- | --- |
@@ -152,7 +152,7 @@ stopTagged()
 | `sampleRate` | `number` | `1` | Keep this fraction of events (e.g. `0.25` ≈ 25%) |
 | `respectDnt` | `boolean` | `true` | Suppress events when Do Not Track is on |
 | `excludeLocalhost` | `boolean` | `true` | Suppress events on localhost / private IPs |
-| `exclude` | `string[]` | none | Path prefixes never tracked (e.g. `['/app', '/account']`). Segment-bounded: `/app` matches `/app` and `/app/…` but not `/application`. Case-insensitive, blind to a trailing slash (`/App/` excludes `/app`) and to percent-encoding (`/%61dmin` excludes `/admin`). Checked at send time, so it holds across SPA navigation |
+| `exclude` | `string[]` | none | Path prefixes never tracked (e.g. `['/app', '/account']`). Segment-bounded: `/app` matches `/app` and `/app/…` but not `/application`. Case-insensitive, blind to a trailing slash (`/App/` excludes `/app`) and to percent-encoding, segment by segment (`/%61dmin` excludes `/admin`; a malformed segment such as `%ZZ` is kept as is, and the other segments are still decoded). Checked at send time, so it holds across SPA navigation |
 | `trackQuery` | `boolean` | `false` | Keep the full query string and hash on URLs |
 | `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
 | `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
