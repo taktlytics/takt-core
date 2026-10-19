@@ -151,6 +151,30 @@ describe('TrackingPolicy.isBlocked()', () => {
     expect(policy.isBlocked()).toBe(true)
   })
 
+  it('matches the percent-decoded path against the exclude entry', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%61dmin/users'),
+      cfg({ exclude: ['/admin'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('matches a percent-encoded exclude entry against the decoded path', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/café/x'),
+      cfg({ exclude: ['/caf%C3%A9'] }),
+    )
+    expect(policy.isBlocked()).toBe(true)
+  })
+
+  it('keeps an undecodable path as is instead of throwing', () => {
+    const policy = new TrackingPolicy(
+      fakeConsent(), fakeDnt(), fakeEnv('example.com', '/%E0%A4%A/app'),
+      cfg({ exclude: ['/app'] }),
+    )
+    expect(policy.isBlocked()).toBe(false)
+  })
+
   it('matches a trailing slash on the path itself', () => {
     const policy = new TrackingPolicy(
       fakeConsent(), fakeDnt(), fakeEnv('example.com', '/app/'),

@@ -12,6 +12,18 @@ export interface TrackingPolicyConfig {
   sampleRate: number
 }
 
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
+function normalizeSegmentPath(path: string): string {
+  return decodePath(path).replace(/\/+$/, '').toLowerCase()
+}
+
 // Frozen short-circuit order: opt-out → DNT → localhost → exclude → sampling.
 export class TrackingPolicy {
   private readonly exclude: string[]
@@ -23,7 +35,7 @@ export class TrackingPolicy {
     private readonly config: TrackingPolicyConfig,
     private readonly random: () => number = Math.random,
   ) {
-    this.exclude = config.exclude.map((s) => s.replace(/\/+$/, '').toLowerCase()).filter(Boolean)
+    this.exclude = config.exclude.map(normalizeSegmentPath).filter(Boolean)
   }
 
   isBlocked(): boolean {
@@ -36,11 +48,8 @@ export class TrackingPolicy {
   }
 
   private isExcludedPath(path: string): boolean {
-    const normalized = path.replace(/\/+$/, '').toLowerCase()
-    for (const pre of this.exclude) {
-      if (normalized === pre || normalized.startsWith(pre + '/')) return true
-    }
-    return false
+    const normalized = normalizeSegmentPath(path)
+    return this.exclude.some((pre) => normalized === pre || normalized.startsWith(pre + '/'))
   }
 
   private isLocalhost(h: string): boolean {
