@@ -101,4 +101,32 @@ describe('runAuto', () => {
     expect(bodies()).toContainEqual(expect.objectContaining({ n: '404', p: { path: '/missing' } }))
     document.body.removeAttribute('data-takt-404')
   })
+
+  it('redacts the 404 path with data-redact-routes', () => {
+    const marker = document.createElement('div')
+    marker.setAttribute('data-takt-404', '')
+    document.body.appendChild(marker)
+    window.history.replaceState({}, '', 'https://example.com/reset/s3cr3t-token')
+    try {
+      runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': '404', 'data-redact-routes': '/reset/[token]' }))
+      expect(bodies()).toContainEqual(expect.objectContaining({ n: '404', p: { path: '/reset/[token]' } }))
+    } finally {
+      marker.remove()
+      window.history.replaceState({}, '', 'https://example.com/')
+    }
+  })
+
+  it('redacts the outbound destination path with data-redact-routes, whatever the host', () => {
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'outbound', 'data-redact-routes': '/verify/[token]' }))
+    beaconMock.mockClear()
+    clickLink('https://partner.io/verify/abc123?x=1')
+    expect(bodies()).toContainEqual(expect.objectContaining({ n: 'Outbound Link: Click', p: { url: 'https://partner.io/verify/[token]' } }))
+  })
+
+  it('redacts same-origin download paths with data-redact-routes', () => {
+    runAuto(scriptEl({ 'data-domain': 'auto.test', 'data-auto': 'downloads', 'data-redact-routes': '/invoices/[id]' }))
+    beaconMock.mockClear()
+    clickLink('https://example.com/invoices/991.pdf')
+    expect(bodies()).toContainEqual(expect.objectContaining({ n: 'File Download', p: { url: 'https://example.com/invoices/[id]' } }))
+  })
 })
