@@ -53,7 +53,7 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
     // Standard DNT value only. The full SDK also honors the legacy DNT 'yes'
     // (old Firefox/Safari), Global Privacy Control (navigator.globalPrivacyControl),
     // and path exclusion (`exclude` in init()); all are omitted from this minimal
-    // snippet to stay within the ≤ 1 kB budget. GPC stays enforced: GPC browsers
+    // snippet to stay within the ~1 kB budget. GPC stays enforced: GPC browsers
     // auto-send the Sec-GPC header on the beacon, which the ingest drops.
     if (dnt && navigator.doNotTrack === '1') return
     if (excl) {

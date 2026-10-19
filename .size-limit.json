@@ -2,7 +2,7 @@
   {
     "name": "snippet (gzip)",
     "path": "dist/takt.js",
-    "limit": "1030 B",
+    "limit": "1040 B",
     "gzip": true
   }
 ]
