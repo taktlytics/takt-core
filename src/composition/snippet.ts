@@ -33,10 +33,10 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
   // + hash) wins over the allowlist, which wins over the default strip — mirrors
   // createUrlScrubber.
   const scrub = (raw: string) => {
-    raw = win.takt?.m?.(raw) ?? raw
+    const masked = win.takt?.m?.(raw) ?? raw
     try {
-      if (keepQuery) return raw
-      const u = new URL(raw)
+      if (keepQuery) return masked
+      const u = new URL(masked)
       if (allow.length) {
         const kept = new URLSearchParams()
         for (const n of allow) { const v = u.searchParams.get(n); if (v !== null) kept.set(n, v) }
@@ -44,7 +44,7 @@ export function runSnippet(el: HTMLScriptElement | null, redact?: (raw: string) 
         return u.origin + u.pathname + (qs ? '?' + qs : '')
       }
       return u.origin + u.pathname
-    } catch { return raw }
+    } catch { return masked }
   }
 
   // Frozen short-circuit order: opt-out → DNT → localhost → sampling.
