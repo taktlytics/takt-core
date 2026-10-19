@@ -59,6 +59,8 @@ Calls made before the script finishes loading are queued and replayed — instal
 
 The base snippet stays under **1 kB gzip**: pageviews, SPA navigation, `window.takt()`, and the privacy guards — nothing more. It respects Do Not Track and strips the query string and hash from URLs by default; the attributes above tune both. For a custom scrubber function, use the npm build (`scrubUrl` below).
 
+The base snippet has neither `exclude` nor `redactRoutes`: its pageviews send the real path of every page, including `/verify/abc123`. Use the npm SDK when a route must never reach analytics. Browsers that send `Sec-GPC: 1` (Global Privacy Control) are still honoured: the ingest drops their events.
+
 ### Auto extensions — `takt.auto.js`
 
 Need outbound clicks, file downloads, HTML-declared events, or 404 detection without writing code? Swap `takt.js` for the opt-in `takt.auto.js` bundle and list what you want in `data-auto`:
@@ -82,6 +84,7 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 - **downloads** default extensions: `pdf, xlsx, docx, pptx, csv, zip, gz, rar, 7z, dmg, exe, apk, mp3, mp4, wav, mov, avi, mkv, txt` — override with `data-downloads-ext="pdf,csv,epub"`.
 - **tagged**: add `data-takt-event="Cta"` to any clickable element; `data-takt-prop-<key>` attributes become props (empty keys/values are ignored). The reserved name `pageview` is refused. Identical to `init({ tagged: true })` on the SDK.
 - **404**: detected at load via the Navigation Timing API, or by adding `data-takt-404` to `<body>` / a `<meta name="takt:404">` tag on server-rendered error pages.
+- **data-redact-routes**: comma-separated route patterns (`data-redact-routes="/reset/[token],/verify/[token]"`), same syntax as `redactRoutes`. Applied to the `404` path, the `Outbound Link: Click` destination (matched on its path, whatever the host) and same-origin `File Download` links. The pageview of `takt.auto.js` is not redacted: it follows the base snippet, so a route with a secret in its path needs the npm SDK's `redactRoutes`.
 
 ## npm
 
@@ -149,7 +152,7 @@ stopTagged()
 | `sampleRate` | `number` | `1` | Keep this fraction of events (e.g. `0.25` ≈ 25%) |
 | `respectDnt` | `boolean` | `true` | Suppress events when Do Not Track is on |
 | `excludeLocalhost` | `boolean` | `true` | Suppress events on localhost / private IPs |
-| `exclude` | `string[]` | — | Path prefixes never tracked (e.g. `['/app', '/account']`). Segment-bounded: `/app` matches `/app` and `/app/…` but not `/application`. Checked at send time, so it holds across SPA navigation |
+| `exclude` | `string[]` | none | Path prefixes never tracked (e.g. `['/app', '/account']`). Segment-bounded: `/app` matches `/app` and `/app/…` but not `/application`. Case-insensitive and blind to a trailing slash (`/App/` excludes `/app`). Checked at send time, so it holds across SPA navigation |
 | `trackQuery` | `boolean` | `false` | Keep the full query string and hash on URLs |
 | `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
 | `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
@@ -181,13 +184,13 @@ Query strings are stripped by default, but path segments are sent as they are: `
 createTakt({ redactRoutes: ['/verify/[token]', '/reset/:code', '/invoices/[id].pdf'] })
 ```
 
-`redactRoutes` lists the sensitive routes. A matching path is sent as the pattern (`/verify/[token]`), every other path keeps its real value, so per-page stats stay intact. Patterns accept SvelteKit / Astro / Next syntax (`[param]`, `[[optional]]`, `[...rest]`, `(group)`) and Vue / React / Angular / Solid syntax (`:param`, `:param?`, `*`, `**`). The rule covers the page URL, same-origin referrers, outbound and download link destinations, and 404 paths.
+`redactRoutes` lists the sensitive routes. A matching path is sent as the pattern (`/verify/[token]`), every other path keeps its real value, so per-page stats stay intact. Patterns accept SvelteKit / Astro / Next syntax (`[param]`, `[[optional]]`, `[...rest]`, `(group)`) and Vue / React / Angular / Solid syntax (`:param`, `:param?`, `*`, `**`). The rule covers the page URL, same-origin referrers, outbound link destinations (matched on their path, whatever the host), same-origin download links, and 404 paths.
 
 ```ts
 createTakt({ routeTemplates: true, routeTemplate: () => currentRoute.id })
 ```
 
-`routeTemplates: true` sends every page as its route template: `/blog/hello` becomes `/blog/[slug]`. It suits fully private apps where no path is worth reading as is; on a public site it merges every article into one row. The core cannot know the router, so it needs a `routeTemplate` resolver, and the framework wrappers wire it for you. When a resolver returns nothing (no matched route), `redactRoutes` still applies and the real path is sent otherwise. Same-origin referrers are reduced to the site origin in this mode, since their template is unknown.
+`routeTemplates: true` sends every page as its route template: `/blog/hello` becomes `/blog/[slug]`. It suits fully private apps where no path is worth reading as is; on a public site it merges every article into one row. The core cannot know the router, so it needs a `routeTemplate` resolver, and the framework wrappers wire it for you. When a resolver returns nothing (no matched route), `redactRoutes` still applies and the real path is sent otherwise. This fallback is fail-open by design: a page the resolver cannot match, and no pattern covers, is sent with its real path. Outbound link destinations never use the resolver, since it describes the current page, not the link. Same-origin referrers are reduced to the site origin in this mode, since their template is unknown.
 
 ## Server-side events — `@vskstudio/takt-core/server`
 
@@ -217,7 +220,7 @@ await takt.event('Purchase', {
 | --- | --- | --- | --- |
 | `domain` | `string` | required | Site identifier, must match the site of the API key |
 | `apiKey` | `string` | — | Site API key with `events:write`, sent as `Authorization: Bearer` |
-| `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()` |
+| `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()`. Must be `https://`; `http://` is accepted only for `localhost`, `127.0.0.1` and `[::1]`, and any other `http://` endpoint throws at construction |
 | `trackQuery` / `queryParams` / `scrubUrl` | | query stripped | Same URL scrubbing as the browser SDK, applied to `url` and `referrer` |
 | `redactRoutes` | `string[]` | — | Same route patterns as the browser SDK. A `route` passed to `pageview()` / `event()` replaces the path of that call |
 | `strict` | `boolean` | `false` | Throw on network errors and non-`202` answers instead of swallowing them |
