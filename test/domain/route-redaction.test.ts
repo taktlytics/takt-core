@@ -322,6 +322,11 @@ describe('parité takt-core-php #8', () => {
     expect(createRouteRedaction({ redactRoutes: ['/orders/123/[x]'] }).path('/orders/12%33/%ZZ')).toBe('/[redacted]')
   })
 
+  it('keeps a path whose invalid byte is glued to a route literal raw when masking is disabled, as takt-core-php does', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: false })
+    expect(routes.path('/%FForders/123')).toBe('/%FForders/123')
+  })
+
   it.each([true, false])('matches a valid encoded path in both modes (redactUndecodablePaths %s)', (strict) => {
     const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: strict })
     expect(routes.path('/orders/%C3%A9')).toBe('/orders/[id]')
