@@ -3,7 +3,7 @@
 # @vskstudio/takt-core
 
 
-> 📚 **Documentation**, [taktlytics.com/docs/wrappers/core](https://taktlytics.com/docs/wrappers/core)
+> 📚 **Documentation**: [taktlytics.com/docs/wrappers/core](https://taktlytics.com/docs/wrappers/core)
 
 **Tiny, privacy-friendly analytics SDK for Takt.**
 
@@ -19,7 +19,7 @@
 - **Zero dependencies**, tree-shakeable ESM module.
 - **~1 kB gzip** drop-in snippet. No build step required.
 - **Privacy first**: honours opt-out and Do Not Track, strips query strings, and excludes localhost / private IPs by default.
-- **Hexagonal core**: a pure domain wrapped in ports & adapters, easy to test, easy to extend.
+- **Hexagonal core**: a pure domain wrapped in ports & adapters. It is easy to test and easy to extend.
 
 ## Snippet (no build step)
 
@@ -27,7 +27,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@vskstudio/takt-core/dist/takt.js" data-domain="example.com"></script>
 ```
 
-> Pin a version in production, e.g. `@vskstudio/takt-core@0.5.0`. jsDelivr and unpkg both serve the snippet straight from npm, no extra hosting required.
+> Pin a version in production, e.g. `@vskstudio/takt-core@0.5.0`. jsDelivr and unpkg both serve the snippet straight from npm. No extra hosting is required.
 
 Then, anywhere on the page:
 
@@ -48,10 +48,10 @@ Calls made before the script finishes loading are queued and replayed. Install a
 | Attribute | Effect | Default |
 | --- | --- | --- |
 | `data-domain` | Site identifier sent with every event | `location.hostname` |
-| `data-script-origin` | First-party origin to derive the endpoint from (`{origin}/api/event`), a custom domain you proxy through to dodge ad-blockers | hosted Takt origin |
+| `data-script-origin` | First-party origin to derive the endpoint from (`{origin}/api/event`): a custom domain you proxy through to dodge ad-blockers | hosted Takt origin |
 | `data-endpoint` | Ingestion endpoint (wins over `data-script-origin`); set `/api/event` for a same-origin first-party proxy | `https://taktlytics.com/api/event` |
 | `data-exclude-localhost="false"` | Track localhost / private IPs | excluded |
-| `data-enabled="false"` | Kill-switch, the tracker does nothing | enabled |
+| `data-enabled="false"` | Kill-switch: the tracker does nothing | enabled |
 | `data-respect-dnt="false"` | Opt out of the Do Not Track short-circuit | respected |
 | `data-sample-rate="0.5"` | Send only this fraction (0 to 1) of events | `1` (all) |
 | `data-track-query` | Keep the full query string and hash (default strips both) | stripped |
@@ -81,7 +81,7 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 | `404` | `404` | `path` |
 | `tagged` | custom (`data-takt-event`) | from `data-takt-prop-*` |
 
-- **downloads** default extensions: `pdf, xlsx, docx, pptx, csv, zip, gz, rar, 7z, dmg, exe, apk, mp3, mp4, wav, mov, avi, mkv, txt`, override with `data-downloads-ext="pdf,csv,epub"`.
+- **downloads** default extensions: `pdf, xlsx, docx, pptx, csv, zip, gz, rar, 7z, dmg, exe, apk, mp3, mp4, wav, mov, avi, mkv, txt`. Override with `data-downloads-ext="pdf,csv,epub"`.
 - **tagged**: add `data-takt-event="Cta"` to any clickable element; `data-takt-prop-<key>` attributes become props (empty keys/values are ignored). The reserved name `pageview` is refused. Identical to `init({ tagged: true })` on the SDK.
 - **404**: detected at load via the Navigation Timing API, or by adding `data-takt-404` to `<body>` / a `<meta name="takt:404">` tag on server-rendered error pages.
 - **data-redact-routes**: comma-separated route patterns (`data-redact-routes="/reset/[token],/verify/[token]"`), same syntax as `redactRoutes`. Applied to the pageview and SPA navigation path, the `404` path, and the `Outbound Link: Click` and `File Download` destinations (matched on their path, whatever the host). The base `takt.js` alone has no redaction: a route with a secret in its path needs `takt.auto.js` with this attribute, or the npm SDK's `redactRoutes`. When `takt.js` is loaded first, the pageview it already sent is not redacted; only navigation after `takt.auto.js` runs is masked, so load `takt.auto.js` alone on pages that carry a secret route.
@@ -108,7 +108,7 @@ track('Signup', {
 
 `init()` creates a single shared instance, fires an automatic pageview, and wires SPA navigation. `track` and `pageview` delegate to it. `optOut`, `optIn`, and `isOptedOut` work with or without it (see [Privacy](#privacy)).
 
-Autocapture toggles, `outbound`, `files`, `notFound`, and `tagged`, opt into the same extensions as the snippet's `data-auto`: outbound-link clicks, file downloads, 404 detection, and `data-takt-event` custom events. `tagged: true` tracks clicks on elements carrying `data-takt-event` (with `data-takt-prop-*` becoming props), matching `data-auto=tagged`.
+The autocapture toggles `outbound`, `files`, `notFound`, and `tagged` opt into the same extensions as the snippet's `data-auto`: outbound-link clicks, file downloads, 404 detection, and `data-takt-event` custom events. `tagged: true` tracks clicks on elements carrying `data-takt-event` (with `data-takt-prop-*` becoming props), matching `data-auto=tagged`.
 
 ### Instance API: `createTakt`
 
@@ -146,9 +146,9 @@ stopTagged()
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `domain` | `string` | `location.hostname` | Site identifier sent with every event |
-| `scriptOrigin` | `string` | hosted Takt origin | First-party origin to derive the endpoint from (`{origin}/api/event`), a custom domain you proxy through to dodge ad-blockers |
+| `scriptOrigin` | `string` | hosted Takt origin | First-party origin to derive the endpoint from (`{origin}/api/event`): a custom domain you proxy through to dodge ad-blockers |
 | `endpoint` | `string` | `https://taktlytics.com/api/event` | Ingestion endpoint (wins over `scriptOrigin`); set `/api/event` for a same-origin first-party proxy |
-| `enabled` | `boolean` | `true` | Master switch, when `false`, nothing is sent |
+| `enabled` | `boolean` | `true` | Master switch: when `false`, nothing is sent |
 | `debug` | `boolean` | `false` | Log each payload to the console before sending |
 | `sampleRate` | `number` | `1` | Keep this fraction of events (e.g. `0.25` ≈ 25%) |
 | `respectDnt` | `boolean` | `true` | Suppress events when Do Not Track is on |
@@ -263,7 +263,7 @@ await stats.breakdown('page')
 ```
 
 `host` defaults to the hosted Takt origin, matching the SDK's ingest default.
-When set, it must be an absolute `http(s)://` origin, anything else
+When set, it must be an absolute `http(s)://` origin. Anything else
 (`javascript:`, `data:`, protocol-relative `//…`) is rejected, so a `host`
 value can never smuggle a non-http scheme into a widget `src` or a `fetch`.
 The value is reduced to its origin: any path, query, or fragment is dropped
@@ -292,7 +292,7 @@ Every event is posted to the endpoint as a compact JSON object. The keys are fro
 domain/          Pure business core, zero I/O. Value objects (EventName, Props,
                  Revenue, AnalyticsEvent), payload mapping, and the URL scrubber.
 application/      Use cases: the Analytics service, the TrackingPolicy (consent +
-                 sampling), and autocapture trackers, depending only on small
+                 sampling), and autocapture trackers, which depend only on small
                  single-method port interfaces.
 infrastructure/   Driven adapters: a resilient fetch/beacon transport, localStorage
                  consent, and browser providers (DNT, environment, history, clicks).
