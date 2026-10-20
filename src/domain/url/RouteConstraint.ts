@@ -7,6 +7,7 @@ const ASCII_PUNCTUATION = /^[!-\/:-@\[-\x60{-~]$/
 const COUNT_QUANTIFIER = /^\{(\d+)(,(\d*))?\}/
 const SPECIAL_IN_CLASS = /[\\\]^\-[]/
 const SLASH_CODE = 0x2f
+const PRINTABLE_ASCII = /^[\x20-\x7e]+$/
 
 interface Cursor {
   readonly text: string
@@ -16,6 +17,7 @@ interface Cursor {
 
 export default function compileConstraint(body: string): string | null {
   if (body.length === 0 || body.length > MAX_CONSTRAINT_LENGTH) return null
+  if (!PRINTABLE_ASCII.test(body)) return null
   const cursor: Cursor = { text: body, index: 0, variableQuantifiers: 0 }
   const branches: string[] = []
   do {
@@ -85,25 +87,31 @@ function parseClass(cursor: Cursor): string | null {
       cursor.index++
       return items.length === 0 ? null : `[${negated ? '^' : ''}${items.join('')}]`
     }
-    const item = parseClassItem(cursor)
+    const item = parseClassItem(cursor, items.length === 0)
     if (item === null) return null
     items.push(item)
   }
 }
 
-function parseClassItem(cursor: Cursor): string | null {
+function parseClassItem(cursor: Cursor, isFirst: boolean): string | null {
   const text = cursor.text
   const start = cursor.index
   const char = text.charAt(start)
   if (char === '\\') return parseEscape(cursor)
   if (FORBIDDEN_LITERALS.includes(char)) return null
+  const next = text.charAt(start + 1)
+  if (char === '-') {
+    if (next === '-' || (!isFirst && next !== ']')) return null
+    cursor.index = start + 1
+    return '\\-'
+  }
   const end = text.charAt(start + 2)
-  const isRange = text.charAt(start + 1) === '-' && end !== '' && end !== ']'
+  const isRange = next === '-' && end !== '' && end !== ']'
   if (!isRange) {
     cursor.index = start + 1
     return escapeClassChar(char)
   }
-  if (FORBIDDEN_LITERALS.includes(end)) return null
+  if (end === '-' || FORBIDDEN_LITERALS.includes(end)) return null
   if (char.charCodeAt(0) > end.charCodeAt(0)) return null
   if (char.charCodeAt(0) <= SLASH_CODE && end.charCodeAt(0) >= SLASH_CODE) return null
   cursor.index = start + 3

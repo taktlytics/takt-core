@@ -23,6 +23,7 @@ const REST = /^(\[\.\.\.[^\]]+\]|\*\*?|\*\w+|:\w+(\([^)]*\))?[*+])$/
 const OPTIONAL = /^(\[\[[^\]]+\]\]|:\w+(\([^)]*\))?\?|\{\w+(<[^>]*>)?\?[^}]*\})$/
 const PARAM = /\[[^\]]+\]|:\w+(\([^)]*\))?|\{\w+(<[^>]*>)?(\?[^}]*)?\}/g
 const BRACE = /\{(\w+)(<[^>]*>)?(\?[^}]*)?\}/g
+const STRAY_BRACE = /[{}]/
 
 function routeSegments(template: string): string[] {
   return template.split(/(?<!<[^>]*)\//).filter((segment) => segment !== '' && !GROUP.test(segment))
@@ -140,7 +141,8 @@ function escapeRegExp(text: string): string {
 }
 
 const CONSTRAINT = /<([^>]*)>/
-const MAX_CONSTRAINED_SEGMENT_LENGTH = 256
+const MAX_CONSTRAINED_SEGMENT_BYTES = 256
+const encoder = new TextEncoder()
 
 interface BuildState {
   unusable: boolean
@@ -160,6 +162,10 @@ function paramSource(param: string, mode: BuildMode, state: BuildState): string 
 }
 
 function segmentSource(segment: string, mode: BuildMode, state: BuildState): string {
+  if (STRAY_BRACE.test(segment.replace(PARAM, ''))) {
+    state.unusable = true
+    return '[^/]+'
+  }
   let source = ''
   let last = 0
   for (const param of segment.matchAll(PARAM)) {
@@ -199,7 +205,7 @@ function compileRoute(pattern: string): CompiledRoute {
 
 function hasOverlongConstrainedSegment(route: CompiledRoute, candidate: string): boolean {
   const match = route.loose.exec(candidate)
-  return match !== null && match.slice(1).some((group) => group !== undefined && group.length > MAX_CONSTRAINED_SEGMENT_LENGTH)
+  return match !== null && match.slice(1).some((group) => group !== undefined && encoder.encode(group).byteLength > MAX_CONSTRAINED_SEGMENT_BYTES)
 }
 
 function parseUrl(raw: string): URL | null {

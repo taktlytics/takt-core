@@ -24,6 +24,10 @@ describe('grammaire des contraintes : cas légitimes', () => {
     ['/c/{id<[\\w-]+>}', '/c/a-b', '/c/{id}'],
     ['/c/{id<[-a]+>}', '/c/-a', '/c/{id}'],
     ['/c/{id<\\.\\-x>}', '/c/.-x', '/c/{id}'],
+    ['/c/{id<[a-z-]+>}', '/c/a-b-', '/c/{id}'],
+    ['/c/{id<[\\d-]+>}', '/c/1-2', '/c/{id}'],
+    ['/c/{id<[a-]+>}', '/c/a-a', '/c/{id}'],
+    ['/n/{id<.+>}', `/n/${'é'.repeat(128)}`, '/n/{id}'],
   ])('%s avec %s', (pattern, path, expected) => {
     expect(mask(pattern, path)).toBe(expected)
   })
@@ -62,6 +66,32 @@ describe('grammaire des contraintes : rejet fail-closed', () => {
     'a\\',
     'a<b',
     '.{1}*',
+    '[\\d-z]',
+    '[a-\\d]',
+    '[--a]',
+    '[a--]',
+    '[--]',
+    '[!--]',
+    '[a-z-0]',
+    '[][a]',
+    '[]a]',
+    '[.]',
+    '[$]',
+    '[(]',
+    '[{]',
+    '[}]',
+    '[|]',
+    '[*]',
+    '[+]',
+    '[?]',
+    '[a^]',
+    '[<]',
+    '[>]',
+    '\\0',
+    '\\01',
+    'é',
+    'a\tb',
+    'a\x7f',
   ])('la contrainte %s rend /[redacted] sur un chemin correspondant', (constraint) => {
     expect(mask(`/x/{id<${constraint}>}`, '/x/aaa')).toBe('/[redacted]')
   })
@@ -74,12 +104,22 @@ describe('grammaire des contraintes : rejet fail-closed', () => {
     expect(mask('/x/{id<>}', '/x/aaa')).toBe('/[redacted]')
   })
 
+  it('masque un segment à accolades non reconnu, même si la contrainte contient un >', () => {
+    expect(mask('/x/{id<[>]>}', '/x/aaa')).toBe('/[redacted]')
+    expect(mask('/x/{id<[>]/a>}', '/x/zz/a')).toBe('/[redacted]')
+  })
+
   it('ne rend pas /[redacted] pour un chemin qui ne correspond pas à la route', () => {
     expect(mask('/x/{id<(a)>}', '/y/aaa')).toBe('/y/aaa')
   })
 })
 
 describe('grammaire des contraintes : bornes', () => {
+  it('compte la longueur du segment en octets UTF-8', () => {
+    expect(mask('/n/{id<.+>}', `/n/${'é'.repeat(129)}`)).toBe('/[redacted]')
+    expect(mask('/n/{id<.+>}', `/n/${'é'.repeat(128)}`)).toBe('/n/{id}')
+  })
+
   it('garde les 100 caractères et deux quantificateurs variables', () => {
     expect(mask(`/x/{id<${'a'.repeat(100)}>}`, `/x/${'a'.repeat(100)}`)).toBe('/x/{id}')
     expect(mask('/x/{id<a{1,100}b{0,}>}', `/x/${'a'.repeat(3)}bb`)).toBe('/x/{id}')
