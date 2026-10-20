@@ -155,12 +155,12 @@ stopTagged()
 | `excludeLocalhost` | `boolean` | `true` | Suppress events on localhost / private IPs |
 | `exclude` | `string[]` | none | Path prefixes never tracked (e.g. `['/app', '/account']`). Segment-bounded: `/app` matches `/app` and `/app/…` but not `/application`. Case-insensitive, blind to a trailing slash (`/App/` excludes `/app`) and to percent-encoding, segment by segment (`/%61dmin` excludes `/admin`; a malformed segment such as `%ZZ` is kept as is, and the other segments are still decoded). Checked at send time, so it holds across SPA navigation |
 | `trackQuery` | `boolean` | `false` | Keep the full query string and hash on URLs |
-| `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
-| `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
-| `redactRoutes` | `string[]` | — | Route patterns whose real path is replaced by the pattern (e.g. `['/verify/[token]']` sends `/verify/[token]`). See [Route redaction](#route-redaction) |
+| `queryParams` | `string[]` | n/a | Allowlist: keep only these query params, drop the rest |
+| `scrubUrl` | `(url: string) => string` | n/a | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
+| `redactRoutes` | `string[]` | n/a | Route patterns whose real path is replaced by the pattern (e.g. `['/verify/[token]']` sends `/verify/[token]`). See [Route redaction](#route-redaction) |
 | `redactUndecodablePaths` | `boolean` | `true` | When a route is configured, a path that cannot be decoded is sent as `/[redacted]`; `false` decodes it leniently and matches it, as takt-core-php does |
 | `routeTemplates` | `boolean` | `false` | Send every URL as its route template instead of the real path. Needs a `routeTemplate` resolver; the framework wrappers provide one |
-| `routeTemplate` | `() => string \| null` | — | Returns the current route template (`/blog/[slug]`, `/users/:id`). Used when `routeTemplates` is on |
+| `routeTemplate` | `() => string \| null` | n/a | Returns the current route template (`/blog/[slug]`, `/users/:id`). Used when `routeTemplates` is on |
 
 ### Privacy
 
@@ -241,10 +241,10 @@ await takt.event('Purchase', {
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `domain` | `string` | required | Site identifier, must match the site of the API key |
-| `apiKey` | `string` | — | Site API key with `events:write`, sent as `Authorization: Bearer` |
+| `apiKey` | `string` | n/a | Site API key with `events:write`, sent as `Authorization: Bearer` |
 | `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()`. Must be `https://`: any `http://` endpoint throws at construction, loopback included (breaking change: `localhost`, `127.0.0.1` and `[::1]` used to be accepted over http) |
 | `trackQuery` / `queryParams` / `scrubUrl` | | query stripped | Same URL scrubbing as the browser SDK, applied to `url` and `referrer` |
-| `redactRoutes` | `string[]` | — | Same route patterns as the browser SDK. A `route` passed to `pageview()` / `event()` replaces the path of that call |
+| `redactRoutes` | `string[]` | n/a | Same route patterns as the browser SDK. A `route` passed to `pageview()` / `event()` replaces the path of that call |
 | `redactUndecodablePaths` | `boolean` | `true` | Same option as the browser SDK |
 | `strict` | `boolean` | `false` | Throw on network errors and non-`202` answers instead of swallowing them |
 | `fetch` | `typeof fetch` | global `fetch` | Custom fetch implementation (Node 18+ ships one) |
@@ -266,7 +266,7 @@ badgeUrl('example.com', { variant: 'd', glyph: 'off', lang: 'en' })
 embedUrl('example.com', { theme: 'dark' })
 // → https://taktlytics.com/embed/example.com?theme=dark
 
-// Anonymous client for the public stats API. Pass `host` for a self-hosted Takt.
+// Anonymous client for the public stats API. Pass `host` to target a custom host (first-party proxy or test environment).
 const stats = createStats({ host: 'https://takt.example.com', domain: 'example.com' })
 await stats.summary(undefined, { period: '30d', compare: 'previous' })
 await stats.timeseries()

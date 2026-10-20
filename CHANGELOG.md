@@ -68,9 +68,9 @@
 
 - 64ad8d1: Default the ingest endpoint and the stats/widget host to the hosted Takt origin (`https://taktlytics.com`).
 
-  `init({ domain })`, the `<script>` snippet, `createStats()`, `badgeUrl()` and `embedUrl()` now talk to the hosted service with no extra config — previously they defaulted to a same-origin relative path, which 405s on static sites that have no `/api/event` backend.
+  `init({ domain })`, the `<script>` snippet, `createStats()`, `badgeUrl()` and `embedUrl()` now talk to the hosted service with no extra config. Previously they defaulted to a same-origin relative path, which 405s on static sites that have no `/api/event` backend.
 
-  **Breaking for first-party proxies / self-hosters:** the old relative default is no longer implicit. To proxy events through your own origin (anti-adblock) pass `endpoint: '/api/event'` (or `data-endpoint="/api/event"`); `scriptOrigin`/`host` still override the default to point at a custom or self-hosted Takt.
+  **Breaking for first-party proxies and custom hosts:** the old relative default is no longer implicit. To proxy events through your own origin (anti-adblock) pass `endpoint: '/api/event'` (or `data-endpoint="/api/event"`); `scriptOrigin`/`host` still override the default to point at a custom host.
 
 ## 0.5.1
 
@@ -93,7 +93,7 @@
 
 ### Patch Changes
 
-- Harden the widget URL builders and stats client: `host` must now be empty (same-origin) or an absolute `http(s)://` origin — `javascript:`, `data:`, and protocol-relative (`//…`) values are rejected so they can never reach a widget `src` or a `fetch`. Also map non-JSON success bodies to `PublicApiError`. Exports the `normalizeHost` helper.
+- Harden the widget URL builders and stats client: `host` must now be empty (same-origin) or an absolute `http(s)://` origin. `javascript:`, `data:`, and protocol-relative (`//…`) values are rejected so they can never reach a widget `src` or a `fetch`. Also map non-JSON success bodies to `PublicApiError`. Exports the `normalizeHost` helper.
 
 ## 0.3.0
 
@@ -140,7 +140,7 @@
 
 - c18348c: Première version publique de `@vskstudio/takt-core` : SDK d'analytics minimaliste et respectueux de la vie privée, en architecture hexagonale.
 
-  - `createTakt(config)` — instance avec `track`, `pageview`, `optOut`/`optIn`, et `enableSpa`/`enableOutbound`/`enableFiles` qui renvoient des disposers.
+  - `createTakt(config)`: instance avec `track`, `pageview`, `optOut`/`optIn`, et `enableSpa`/`enableOutbound`/`enableFiles` qui renvoient des disposers.
   - Helpers top-level `init`/`track`/`pageview`/`optOut`/`optIn` sur une instance par défaut.
   - Snippet IIFE ≤ 1 kB gzip avec configuration `data-*`, file d'attente de bootstrap et `window.takt`.
   - Respect de l'opt-out, de Do Not Track, et exclusion localhost/IP privées par défaut.
