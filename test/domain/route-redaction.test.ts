@@ -46,6 +46,8 @@ describe('createRouteRedaction', () => {
       ['/verify/[token]', '/verifyx/abc'],
       ['/verify/:token', '/other/abc'],
       ['/p/[slug]-[id]', '/p/shoes'],
+      ['/orders/[id]', '/orders%252F123/items'],
+      ['/orders/[id]', '/orders/%2e%2e/123'],
     ])('%s leaves %s untouched', (pattern, path) => {
       expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(path)
     })
@@ -56,9 +58,14 @@ describe('createRouteRedaction', () => {
       expect(routes.path('/verify/abc')).toBe('/verify/[token]')
     })
 
-    it('keeps the query and hash of the page URL for the scrubber to handle', () => {
+    it('drops the query and hash of a masked page URL', () => {
       const routes = createRouteRedaction({ redactRoutes: ['/verify/[token]'] })
-      expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]?next=%2Fapp#top')
+      expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
+    })
+
+    it('keeps the query and hash of an unmatched page URL', () => {
+      const routes = createRouteRedaction({ redactRoutes: ['/verify/[token]'] })
+      expect(routes.page('https://example.com/pricing?next=%2Fapp#top')).toBe('https://example.com/pricing?next=%2Fapp#top')
     })
 
     it('leaves unmatched and unparsable URLs untouched', () => {
@@ -90,7 +97,7 @@ describe('createRouteRedaction', () => {
     it('sends the template of the current route for every page', () => {
       const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/(auth)/verify/[token]' })
       expect(routes.templated).toBe(true)
-      expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]?next=%2Fapp#top')
+      expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
     })
 
     it('falls back to redactRoutes, then to the real path, when the router has no template', () => {
@@ -99,7 +106,7 @@ describe('createRouteRedaction', () => {
         routeTemplate: () => null,
         redactRoutes: ['/verify/[token]'],
       })
-      expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]?next=%2Fapp#top')
+      expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
       expect(routes.page('https://example.com/about')).toBe('https://example.com/about')
     })
 
@@ -133,10 +140,88 @@ describe('createRouteRedaction', () => {
     expect(routes.path('/a/b')).toBe('/a/b')
   })
 
-  it('matches a route on an encoded slash and on a malformed segment next to it', () => {
+  it('matches a route whatever the case of the path', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/Orders/123')).toBe('/orders/[id]')
+    expect(routes.path('/ORDERS/123')).toBe('/orders/[id]')
+    expect(routes.page('https://example.com/Orders/123?x=1')).toBe('https://example.com/orders/[id]')
+  })
+
+  it('matches a route on a double-encoded slash', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/orders%252F123')).toBe('/orders/[id]')
+    expect(routes.path('/orders%25252F123')).toBe('/orders/[id]')
+  })
+
+  it('normalizes dot segments before matching, encoded or not', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/orders/../orders/123')).toBe('/orders/[id]')
+    expect(routes.path('/./orders/123')).toBe('/orders/[id]')
+    expect(routes.path('/orders/./123')).toBe('/orders/[id]')
+    expect(routes.path('/orders/%2e%2e/orders/123')).toBe('/orders/[id]')
+    expect(routes.path('/orders/%2E/123')).toBe('/orders/[id]')
+    expect(routes.path('/x/../orders/123/')).toBe('/orders/[id]')
+  })
+
+  it('collapses repeated slashes before matching', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('//orders/123')).toBe('/orders/[id]')
+    expect(routes.path('/orders//123')).toBe('/orders/[id]')
+    expect(routes.path('/orders/123//')).toBe('/orders/[id]')
+  })
+
+  it('masks a path that cannot be decoded instead of sending it raw', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/orders/%FF%FE')).toBe('/[redacted]')
+    expect(routes.path('/orders/%E0%A4%A')).toBe('/[redacted]')
+    expect(routes.page('https://example.com/orders/%ZZ?token=t')).toBe('https://example.com/[redacted]')
+  })
+
+  it('leaves an undecodable path alone when no route is configured', () => {
+    expect(createRouteRedaction().path('/orders/%ZZ')).toBe('/orders/%ZZ')
+    expect(createRouteRedaction().page('https://example.com/%E0%A4%A')).toBe('https://example.com/%E0%A4%A')
+  })
+
+  it('matches a route under triple encoding of the slash', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/orders%25252F123')).toBe('/orders/[id]')
+  })
+
+  it('matches a route encoded five times, the deepest depth the decoder follows', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    let encoded = '/'
+    for (let depth = 0; depth < 5; depth++) encoded = encodeURIComponent(encoded)
+    expect(routes.path('/orders' + encoded + '123')).toBe('/orders/[id]')
+  })
+
+  it('masks a path encoded deeper than the decoder follows', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    let encoded = '/'
+    for (let depth = 0; depth < 6; depth++) encoded = encodeURIComponent(encoded)
+    expect(routes.path('/orders' + encoded + '123')).toBe('/[redacted]')
+  })
+
+  it('normalizes dot segments that are encoded more than once', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/%25252e%25252e/orders/123')).toBe('/orders/[id]')
+  })
+
+  it('ignores matrix parameters on each segment', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]', '/admin/[page]'] })
+    expect(routes.path('/orders;a=1/123')).toBe('/orders/[id]')
+    expect(routes.path('/admin;x/secret')).toBe('/admin/[page]')
+    expect(routes.path('/orders%3Ba=1/123')).toBe('/orders/[id]')
+  })
+
+  it('keeps an encoded slash literal in a route while decoding the other escapes', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/files%2Fx/[id]'] })
+    expect(routes.path('/files%2Fx/%41')).toBe('/files%2Fx/[id]')
+  })
+
+  it('matches a route on an encoded slash and masks a malformed path', () => {
     const routes = createRouteRedaction({ redactRoutes: ['/invoices/[id]'] })
     expect(routes.pattern('/invoices%2F991')).toBe('/invoices/[id]')
-    expect(routes.pattern('/%ZZ/invoices/991')).toBe('/%ZZ/invoices/991')
-    expect(routes.pattern('/invoices/%ZZ')).toBe('/invoices/[id]')
+    expect(routes.pattern('/%ZZ/invoices/991')).toBe('/[redacted]')
+    expect(routes.pattern('/invoices/%ZZ')).toBe('/[redacted]')
   })
 })

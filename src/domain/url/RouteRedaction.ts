@@ -1,5 +1,3 @@
-import decodePathSegments from './decodePathSegments'
-
 export type RouteTemplateResolver = () => string | null | undefined
 
 export interface RouteRedactionOptions {
@@ -35,6 +33,92 @@ export function canonicalRoute(template: string): string {
   return '/' + routeSegments(template).map(canonicalSegment).join('/')
 }
 
+const MAX_DECODE_PASSES = 5
+const FAILED_OUTPUT = '/[redacted]'
+const RESERVED_ESCAPES = ['23', '24', '26', '2B', '2C', '2F', '3A', '3B', '3D', '3F', '40']
+const ENCODED_SPLIT = /(%[0-9A-Fa-f]{2})/
+const ENCODED_TOKEN = /^%[0-9A-Fa-f]{2}$/
+const UTF8_ENCODER = new TextEncoder()
+const STRICT_UTF8_DECODER = new TextDecoder('utf-8', { fatal: true })
+
+function collapseSlashes(path: string): string {
+  return path.replace(/\/{2,}/g, '/')
+}
+
+function removeDotSegments(path: string): string {
+  const absolute = path.startsWith('/')
+  const segments = (absolute ? path.slice(1) : path).split('/')
+  const last = segments.length - 1
+  const kept: string[] = []
+  segments.forEach((segment, index) => {
+    if (segment === '.') {
+      if (index === last) kept.push('')
+    } else if (segment === '..') {
+      kept.pop()
+      if (index === last) kept.push('')
+    } else {
+      kept.push(segment)
+    }
+  })
+  return (absolute ? '/' : '') + kept.join('/')
+}
+
+function normalizePath(path: string): string {
+  return collapseSlashes(removeDotSegments(collapseSlashes(path)))
+}
+
+function decodeOnce(path: string): string | null {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return null
+  }
+}
+
+function decodeChain(pathname: string): string[] | null {
+  const forms = [pathname]
+  let current = pathname
+  for (let pass = 0; pass <= MAX_DECODE_PASSES; pass++) {
+    const next = decodeOnce(current)
+    if (next === null) return null
+    if (next === current) return forms
+    forms.push(next)
+    current = next
+  }
+  return null
+}
+
+function decodeUri(path: string): string {
+  const bytes = path.split(ENCODED_SPLIT).flatMap((token) => {
+    if (!ENCODED_TOKEN.test(token) || RESERVED_ESCAPES.includes(token.slice(1).toUpperCase())) {
+      return [...UTF8_ENCODER.encode(token)]
+    }
+    return [parseInt(token.slice(1), 16)]
+  })
+  try {
+    return STRICT_UTF8_DECODER.decode(Uint8Array.from(bytes))
+  } catch {
+    return path
+  }
+}
+
+function stripMatrixParameters(path: string): string {
+  return path
+    .split('/')
+    .map((segment) => {
+      const semicolon = segment.indexOf(';')
+      return semicolon === -1 ? segment : segment.slice(0, semicolon)
+    })
+    .join('/')
+}
+
+function candidatePaths(pathname: string): string[] | null {
+  const decoded = decodeChain(pathname)
+  if (decoded === null) return null
+  const forms = [...decoded, decodeUri(pathname)]
+  return [...forms, ...forms.map(stripMatrixParameters)].map(normalizePath)
+}
+
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -57,7 +141,7 @@ function compileRoute(pattern: string): RegExp {
       return '/' + segmentSource(segment)
     })
     .join('')
-  return new RegExp(`^${source}/?$`)
+  return new RegExp(`^${source}/?$`, 'i')
 }
 
 function parseUrl(raw: string): URL | null {
@@ -66,10 +150,6 @@ function parseUrl(raw: string): URL | null {
   } catch {
     return null
   }
-}
-
-function withPath(url: URL, path: string): string {
-  return url.origin + path + url.search + url.hash
 }
 
 export default function createRouteRedaction(options: RouteRedactionOptions = {}): RouteRedaction {
@@ -81,9 +161,10 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
   const templated = typeof resolver === 'function'
 
   function redactedPath(pathname: string): string | null {
-    const decoded = decodePathSegments(pathname)
+    const candidates = candidatePaths(pathname)
+    if (candidates === null) return routes.length > 0 ? FAILED_OUTPUT : null
     for (const route of routes) {
-      if (route.regex.test(pathname) || route.regex.test(decoded)) return route.output
+      if (candidates.some((candidate) => route.regex.test(candidate))) return route.output
     }
     return null
   }
@@ -102,7 +183,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     const url = parseUrl(raw)
     if (!url) return raw
     const path = template ?? redactedPath(url.pathname)
-    return path === null ? raw : withPath(url, path)
+    return path === null ? raw : url.origin + path
   }
 
   function sameOrigin(raw: string, pageUrl: string): URL | null {
