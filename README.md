@@ -85,7 +85,7 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 - **tagged**: add `data-takt-event="Cta"` to any clickable element; `data-takt-prop-<key>` attributes become props (empty keys/values are ignored). The reserved name `pageview` is refused. Identical to `init({ tagged: true })` on the SDK.
 - **404**: detected at load via the Navigation Timing API, or by adding `data-takt-404` to `<body>` / a `<meta name="takt:404">` tag on server-rendered error pages.
 - **data-redact-routes**: comma-separated route patterns (`data-redact-routes="/reset/[token],/verify/[token]"`), same syntax as `redactRoutes`. Applied to the pageview and SPA navigation path, the `404` path, and the `Outbound Link: Click` and `File Download` destinations (matched on their path, whatever the host). The base `takt.js` alone has no redaction: a route with a secret in its path needs `takt.auto.js` with this attribute, or the npm SDK's `redactRoutes`. When `takt.js` is loaded first, the pageview it already sent is not redacted; only navigation after `takt.auto.js` runs is masked, so load `takt.auto.js` alone on pages that carry a secret route.
-- **data-redact-undecodable-paths**: `"false"` decodes a path that cannot be decoded leniently (invalid escapes kept) and matches it, instead of sending `/[redacted]` (default: masked when a route is configured). See [Route redaction](#route-redaction).
+- **data-redact-undecodable-paths**: only the literal `"false"` decodes a path that cannot be decoded leniently (invalid escapes kept) and matches it, instead of sending `/[redacted]`. Any other value, or no attribute, keeps the masking (default: masked when a route is configured). See [Route redaction](#route-redaction).
 
 ## npm
 
