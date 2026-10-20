@@ -1,3 +1,5 @@
+import compileConstraint from './RouteConstraint'
+
 export type RouteTemplateResolver = () => string | null | undefined
 
 export interface RouteRedactionOptions {
@@ -138,50 +140,66 @@ function escapeRegExp(text: string): string {
 }
 
 const CONSTRAINT = /<([^>]*)>/
-const MAX_CONSTRAINT_LENGTH = 100
-const UNUSABLE_CONSTRAINT = /[/^$]|\(\?<|\\[1-9k]|\([^)]*[*+}]\)[*+{]/
+const MAX_CONSTRAINED_SEGMENT_LENGTH = 256
 
-function usableConstraint(body: string): boolean {
-  if (body === '' || body.length > MAX_CONSTRAINT_LENGTH || UNUSABLE_CONSTRAINT.test(body)) return false
-  try {
-    return Boolean(new RegExp(body, 'i')) && Boolean(new RegExp(`^(?:${body})$`, 'i'))
-  } catch {
-    return false
-  }
-}
-
-interface CompileState {
+interface BuildState {
   unusable: boolean
 }
 
-function paramSource(param: string, state: CompileState): string {
+type BuildMode = 'strict' | 'loose'
+
+function paramSource(param: string, mode: BuildMode, state: BuildState): string {
   const body = param.startsWith('{') ? CONSTRAINT.exec(param)?.[1] : undefined
   if (body === undefined) return '[^/]+'
-  if (usableConstraint(body)) return `(?:${body})`
-  state.unusable = true
-  return '[^/]+'
+  const constraint = compileConstraint(body)
+  if (constraint === null) {
+    state.unusable = true
+    return '[^/]+'
+  }
+  return mode === 'strict' ? `(?:${constraint})` : '([^/]+)'
 }
 
-function segmentSource(segment: string, state: CompileState): string {
+function segmentSource(segment: string, mode: BuildMode, state: BuildState): string {
   let source = ''
   let last = 0
   for (const param of segment.matchAll(PARAM)) {
-    source += escapeRegExp(segment.slice(last, param.index)) + paramSource(param[0], state)
+    source += escapeRegExp(segment.slice(last, param.index)) + paramSource(param[0], mode, state)
     last = param.index + param[0].length
   }
   return source + escapeRegExp(segment.slice(last))
 }
 
-function compileRoute(pattern: string): { regex: RegExp; unusable: boolean } {
-  const state: CompileState = { unusable: false }
-  const source = routeSegments(pattern)
+function buildSource(segments: string[], mode: BuildMode, state: BuildState): string {
+  return segments
     .map((segment) => {
       if (REST.test(segment)) return '(?:/.*)?'
-      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment, state)})?`
-      return '/' + segmentSource(segment, state)
+      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment, mode, state)})?`
+      return '/' + segmentSource(segment, mode, state)
     })
     .join('')
-  return { regex: new RegExp(`^${source}/?$`, 'i'), unusable: state.unusable }
+}
+
+interface CompiledRoute {
+  regex: RegExp
+  loose: RegExp
+  unusable: boolean
+}
+
+function compileRoute(pattern: string): CompiledRoute {
+  const segments = routeSegments(pattern)
+  const state: BuildState = { unusable: false }
+  const source = buildSource(segments, 'strict', state)
+  const loose = buildSource(segments, 'loose', { unusable: false })
+  return {
+    regex: new RegExp(`^${source}/?$`, 'i'),
+    loose: new RegExp(`^${loose}/?$`, 'i'),
+    unusable: state.unusable,
+  }
+}
+
+function hasOverlongConstrainedSegment(route: CompiledRoute, candidate: string): boolean {
+  const match = route.loose.exec(candidate)
+  return match !== null && match.slice(1).some((group) => group !== undefined && group.length > MAX_CONSTRAINED_SEGMENT_LENGTH)
 }
 
 function parseUrl(raw: string): URL | null {
@@ -206,6 +224,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     const candidates = candidatePaths(pathname, decodeStep)
     if (candidates === null) return FAILED_OUTPUT
     for (const route of routes) {
+      if (candidates.some((candidate) => hasOverlongConstrainedSegment(route, candidate))) return FAILED_OUTPUT
       if (candidates.some((candidate) => route.regex.test(candidate))) return route.unusable ? FAILED_OUTPUT : route.output
     }
     return null
