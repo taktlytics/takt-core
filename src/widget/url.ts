@@ -3,7 +3,7 @@
 // their `src` from these so the allow-listed params stay in one place.
 //
 // `host` defaults to the hosted Takt origin, mirroring the SDK's ingest default.
-// Self-hosters / first-party proxies point it at their own Takt host, e.g.
+// First-party proxies and custom hosts point it at their own host, e.g.
 // `host: 'https://takt.example.com'`.
 
 import { DEFAULT_TAKT_ORIGIN } from '../defaults'
@@ -40,7 +40,7 @@ export function normalizeHost(host?: string): string {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error('takt: host must be an absolute http(s) URL (e.g. https://takt.example.com) or empty')
   }
-  // Keep only the origin — a host carrying a path/query/fragment would otherwise
+  // Keep only the origin: a host carrying a path/query/fragment would otherwise
   // splice into the built URL (e.g. `https://x/y?a=1/public/...`).
   return url.origin
 }

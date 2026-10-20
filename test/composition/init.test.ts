@@ -134,7 +134,7 @@ describe('composition/index init()', () => {
   })
 
   it('track/pageview are no-ops when not init-ed', () => {
-    // _reset() called in beforeEach — no init
+    // _reset() called in beforeEach, no init
     expect(() => track('Signup')).not.toThrow()
     expect(() => pageview()).not.toThrow()
     expect(beaconMock).not.toHaveBeenCalled()

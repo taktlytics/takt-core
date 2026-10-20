@@ -1,7 +1,7 @@
 import { warnOnce } from '../util/warn'
 
 // Sanitised string→string map. Non-strings are coerced, empty values dropped,
-// keys/values truncated, count capped — the event still sends, clamps warn once.
+// keys/values truncated, count capped: the event still sends, clamps warn once.
 export class Props {
   static readonly MAX_PROPS = 30
   static readonly MAX_KEY_LENGTH = 64
