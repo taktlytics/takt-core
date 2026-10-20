@@ -13,6 +13,10 @@ describe('canonicalRoute', () => {
     ['/docs/**', '/docs/*'],
     ['verify/:token/', '/verify/:token'],
     ['/(marketing)', '/'],
+    ['/orders/{id}', '/orders/{id}'],
+    ['/posts/{page?}', '/posts/{page}'],
+    ['/orders/{id<\\d+>}', '/orders/{id}'],
+    ['/users/{id?<\\d+>}', '/users/{id}'],
     ['', '/'],
   ])('%s becomes %s', (template, expected) => {
     expect(canonicalRoute(template)).toBe(expected)
@@ -36,7 +40,12 @@ describe('createRouteRedaction', () => {
       ['/users/:id?', '/users', '/users/:id'],
       ['/users/:id(\\d+)', '/users/7', '/users/:id'],
       ['/users/:id(\\d+)?', '/users', '/users/:id'],
-    ])('%s rewrites %s to %s', (pattern, path, expected) => {
+      ['/orders/{id}', '/orders/123', '/orders/{id}'],
+      ['/posts/{page?}', '/posts', '/posts/{page}'],
+      ['/posts/{page?}', '/posts/3', '/posts/{page}'],
+      ['/orders/{id<\\d+>}', '/orders/abc', '/orders/{id}'],
+      ['/users/{id?<\\d+>}', '/users', '/users/{id}'],
+    ])('%s rewrites %s to %s',(pattern, path, expected) => {
       expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(expected)
     })
 
@@ -48,7 +57,9 @@ describe('createRouteRedaction', () => {
       ['/p/[slug]-[id]', '/p/shoes'],
       ['/orders/[id]', '/orders%252F123/items'],
       ['/orders/[id]', '/orders/%2e%2e/123'],
-    ])('%s leaves %s untouched', (pattern, path) => {
+      ['/orders/{id}', '/orders'],
+      ['/orders/{id}', '/orders/1/2'],
+    ])('%s leaves %s untouched',(pattern, path) => {
       expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(path)
     })
 
@@ -175,6 +186,18 @@ describe('createRouteRedaction', () => {
     expect(routes.path('/orders/%FF%FE')).toBe('/[redacted]')
     expect(routes.path('/orders/%E0%A4%A')).toBe('/[redacted]')
     expect(routes.page('https://example.com/orders/%ZZ?token=t')).toBe('https://example.com/[redacted]')
+  })
+
+  it('keeps an undecodable path raw when redactUndecodablePaths is false', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: false })
+    expect(routes.path('/orders/%ZZ')).toBe('/orders/%ZZ')
+    expect(routes.page('https://example.com/orders/%ZZ?token=t')).toBe('https://example.com/orders/%ZZ?token=t')
+    expect(routes.path('/orders/123')).toBe('/orders/[id]')
+  })
+
+  it('masks an undecodable path when redactUndecodablePaths is true', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: true })
+    expect(routes.path('/orders/%ZZ')).toBe('/[redacted]')
   })
 
   it('leaves an undecodable path alone when no route is configured', () => {

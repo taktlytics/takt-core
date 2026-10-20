@@ -19,7 +19,10 @@ const DEFAULT_EXT = 'pdf,xlsx,docx,pptx,csv,zip,gz,rar,7z,dmg,exe,apk,mp3,mp4,wa
 export function runAuto(el: HTMLScriptElement | null): void {
   if ((window as unknown as { takt?: AutoTakt }).takt?.auto) return
   const get = (k: string) => (el ? el.getAttribute(k) : null)
-  const routes = createRouteRedaction({ redactRoutes: (get('data-redact-routes') || '').split(',') })
+  const routes = createRouteRedaction({
+    redactRoutes: (get('data-redact-routes') || '').split(','),
+    redactUndecodablePaths: get('data-redact-undecodable-paths') !== 'false',
+  })
   runSnippet(el, routes.page)
   const takt = (window as unknown as { takt?: AutoTakt }).takt
   if (!takt) return

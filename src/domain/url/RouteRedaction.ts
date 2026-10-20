@@ -4,6 +4,7 @@ export interface RouteRedactionOptions {
   redactRoutes?: string[]
   routeTemplates?: boolean
   routeTemplate?: RouteTemplateResolver
+  redactUndecodablePaths?: boolean
 }
 
 export interface RouteRedaction {
@@ -17,8 +18,9 @@ export interface RouteRedaction {
 
 const GROUP = /^\(.+\)$/
 const REST = /^(\[\.\.\.[^\]]+\]|\*\*?|\*\w+|:\w+(\([^)]*\))?[*+])$/
-const OPTIONAL = /^(\[\[[^\]]+\]\]|:\w+(\([^)]*\))?\?)$/
-const PARAM = /\[[^\]]+\]|:\w+(\([^)]*\))?/g
+const OPTIONAL = /^(\[\[[^\]]+\]\]|:\w+(\([^)]*\))?\?|\{\w+(<[^>]*>)?\?[^}]*\})$/
+const PARAM = /\[[^\]]+\]|:\w+(\([^)]*\))?|\{\w+(<[^>]*>)?(\?[^}]*)?\}/g
+const BRACE = /\{(\w+)(<[^>]*>)?(\?[^}]*)?\}/g
 
 function routeSegments(template: string): string[] {
   return template.split('/').filter((segment) => segment !== '' && !GROUP.test(segment))
@@ -26,7 +28,7 @@ function routeSegments(template: string): string[] {
 
 function canonicalSegment(segment: string): string {
   if (segment === '**') return '*'
-  return segment.replace(/:(\w+)(\([^)]*\))?[?*+]?/g, ':$1')
+  return segment.replace(/:(\w+)(\([^)]*\))?[?*+]?/g, ':$1').replace(BRACE, '{$1}')
 }
 
 export function canonicalRoute(template: string): string {
@@ -155,10 +157,11 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     .map((pattern) => ({ regex: compileRoute(pattern), output: canonicalRoute(pattern) }))
   const resolver = options.routeTemplates ? options.routeTemplate : undefined
   const templated = typeof resolver === 'function'
+  const maskUndecodable = options.redactUndecodablePaths !== false
 
   function redactedPath(pathname: string): string | null {
     const candidates = candidatePaths(pathname)
-    if (candidates === null) return routes.length > 0 ? FAILED_OUTPUT : null
+    if (candidates === null) return routes.length > 0 && maskUndecodable ? FAILED_OUTPUT : null
     for (const route of routes) {
       if (candidates.some((candidate) => route.regex.test(candidate))) return route.output
     }

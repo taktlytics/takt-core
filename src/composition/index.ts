@@ -60,6 +60,7 @@ export interface InitOptions {
   queryParams?: string[]
   scrubUrl?: UrlScrubber
   redactRoutes?: string[]
+  redactUndecodablePaths?: boolean
   routeTemplates?: boolean
   routeTemplate?: RouteTemplateResolver
   auto?: boolean
@@ -91,6 +92,7 @@ export function init(opts: InitOptions = {}): Analytics {
     queryParams: opts.queryParams,
     scrubUrl: opts.scrubUrl,
     redactRoutes: opts.redactRoutes,
+    redactUndecodablePaths: opts.redactUndecodablePaths,
     routeTemplates: opts.routeTemplates,
     routeTemplate: opts.routeTemplate,
   })
