@@ -1,5 +1,11 @@
 # @vskstudio/takt-core
 
+## 0.12.2
+
+### Patch Changes
+
+- cd9bc57: The default list of tracked download extensions is now one list shared by the SDK (`enableFiles()`) and `takt.auto.js`, with 21 extensions: `pdf, zip, dmg, xlsx, csv, doc, docx, ppt, pptx, rar, 7z, gz, mp3, mp4, wav, avi, mov, exe, apk, mkv, txt`. The SDK now also tracks `exe`, `apk`, `mkv` and `txt`, and `takt.auto.js` now also tracks `doc` and `ppt`. No extension tracked before is dropped on either entry point. A test fails if the two entry points diverge.
+
 ## 0.12.1
 
 ### Patch Changes

@@ -2,14 +2,13 @@ import { runSnippet } from './snippet'
 import { readTaggedEvent } from '../domain/event/tagged'
 import createRouteRedaction from '../domain/url/RouteRedaction'
 import { NotFoundTracker } from '../application/autocapture/NotFoundTracker'
+import { DEFAULT_DOWNLOAD_EXTENSIONS } from '../domain/download/defaultExtensions'
 
 type Props = Record<string, string>
 type TaktFn = (name: string, opts?: { props?: Props }) => void
 type AutoTakt = TaktFn & { auto?: true }
 
-// Liste d'extensions de fichiers considérées comme téléchargements (surchargée
-// par data-downloads-ext). Volontairement large : documents, archives, médias.
-const DEFAULT_EXT = 'pdf,xlsx,docx,pptx,csv,zip,gz,rar,7z,dmg,exe,apk,mp3,mp4,wav,mov,avi,mkv,txt'
+const DEFAULT_EXT = DEFAULT_DOWNLOAD_EXTENSIONS.join(',')
 
 // runAuto = tracker de base (runSnippet : pageview, SPA, window.takt, vie privée)
 // + extensions automatiques opt-in déclarées dans data-auto : clics sortants,
