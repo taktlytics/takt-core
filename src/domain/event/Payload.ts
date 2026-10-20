@@ -1,6 +1,6 @@
 import type { AnalyticsEvent } from './AnalyticsEvent'
 
-/** Wire DTO sent to the backend. Keys are FROZEN — the Go ingestor depends on this shape. */
+/** Wire DTO sent to the backend. Keys are FROZEN: the Go ingestor depends on this shape. */
 export interface Payload {
   n: string
   d: string

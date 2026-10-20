@@ -11,7 +11,7 @@ import createRouteRedaction, { type RouteTemplateResolver } from '../domain/url/
 import { warnOnce } from '../domain/util/warn'
 import { DEFAULT_TAKT_ORIGIN } from '../defaults'
 
-/** Configuration for {@link createTakt} — the core SDK without the autocapture toggles. */
+/** Configuration for {@link createTakt}: the core SDK without the autocapture toggles. */
 export interface Config {
   domain?: string
   endpoint?: string
@@ -34,7 +34,7 @@ export interface Config {
 /**
  * Resolve the ingest endpoint. `endpoint` wins if given; otherwise derive
  * `${origin}/api/event` from `scriptOrigin` (first-party / anti-adblock: a custom
- * domain you proxy through) — or, with neither set, from the hosted Takt origin
+ * domain you proxy through), or, with neither set, from the hosted Takt origin
  * so the SaaS case works with no config. Pass `endpoint: '/api/event'` for a pure
  * same-origin first-party proxy.
  */
@@ -44,7 +44,7 @@ export function resolveEndpoint(endpoint?: string, scriptOrigin?: string): strin
 }
 
 /**
- * Create a standalone instance the caller owns — privacy defaults on, but no
+ * Create a standalone instance the caller owns, privacy defaults on, but no
  * autocapture and no module singleton (unlike {@link init}).
  */
 export function createTakt(config: Config = {}): Analytics {

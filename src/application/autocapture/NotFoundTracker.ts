@@ -25,7 +25,7 @@ export class NotFoundTracker {
           | undefined
         if (nav?.responseStatus === 404) is404 = true
       } catch {
-        /* Navigation Timing unavailable — rely on the marker only. */
+        /* Navigation Timing unavailable, rely on the marker only. */
       }
     }
     if (is404) this.emit('404', { props: { path: this.redactPath(location.pathname) } })

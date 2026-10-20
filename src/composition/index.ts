@@ -45,7 +45,7 @@ const visitorConsent = new LocalStorageConsentStore()
 let _instance: Analytics | null = null
 let _disposers: Array<() => void> = []
 
-/** Options for {@link init} — `createTakt`'s {@link Config} plus the autocapture toggles. */
+/** Options for {@link init}: `createTakt`'s {@link Config} plus the autocapture toggles. */
 export interface InitOptions {
   domain?: string
   endpoint?: string
@@ -72,8 +72,8 @@ export interface InitOptions {
 }
 
 /**
- * Bootstrap the default instance: create it, enable requested autocapture, and —
- * unless `auto` is `false` — start SPA tracking and fire an initial pageview.
+ * Bootstrap the default instance: create it, enable requested autocapture, and
+ * unless `auto` is `false`, start SPA tracking and fire an initial pageview.
  */
 export function init(opts: InitOptions = {}): Analytics {
   _reset()
