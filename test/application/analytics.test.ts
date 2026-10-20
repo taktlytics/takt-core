@@ -483,7 +483,7 @@ describe('Analytics', () => {
       }
     })
 
-    it('falls back to the redactRoutes pattern on a 404 when the resolver returns nothing', () => {
+    it('masks the path of a 404 in template mode when the resolver returns nothing', () => {
       const marker = document.createElement('div')
       marker.setAttribute('data-takt-404', '')
       document.body.appendChild(marker)
@@ -494,6 +494,29 @@ describe('Analytics', () => {
           createRouteRedaction({
             redactRoutes: ['/verify/[token]'],
             routeTemplates: true,
+            routeTemplate: () => null,
+          }),
+          envAt('/verify/abc123'),
+        )
+        analytics.enable404()
+        expect(calls[0]).toMatchObject({ n: '404', p: { path: '/[redacted]' } })
+      } finally {
+        marker.remove()
+        history.replaceState(null, '', previous)
+      }
+    })
+
+    it('applies the redactRoutes pattern on a 404 outside template mode when no template is resolved', () => {
+      const marker = document.createElement('div')
+      marker.setAttribute('data-takt-404', '')
+      document.body.appendChild(marker)
+      const previous = location.pathname
+      history.replaceState(null, '', '/verify/abc123')
+      try {
+        const { analytics, calls } = makeWithRoutes(
+          createRouteRedaction({
+            redactRoutes: ['/verify/[token]'],
+            routeTemplates: false,
             routeTemplate: () => null,
           }),
           envAt('/verify/abc123'),

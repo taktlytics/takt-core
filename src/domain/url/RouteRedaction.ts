@@ -383,7 +383,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
       if (!url) return rawUrl
       return url.origin + (templated ? REDACTED_PATH : patternPath(url.pathname))
     },
-    path: (pathname) => currentTemplate() ?? patternPath(pathname),
+    path: (pathname) => currentTemplate() ?? (templated ? REDACTED_PATH : patternPath(pathname)),
     pattern: patternPath,
   }
 }
