@@ -273,6 +273,16 @@ describe('parité takt-core-php #8', () => {
     expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(expected)
   })
 
+  it('matches a route on the decoded form of a path that is also escaped on its literal segments', () => {
+    expect(createRouteRedaction({ redactRoutes: ['/files%2Fx/[id]'] }).path('/%66iles%2Fx/%41')).toBe('/files%2Fx/[id]')
+  })
+
+  it('escapes the literal tail of a route so a dot is not a wildcard', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/invoices/[id].json'] })
+    expect(routes.path('/invoices/123Xjson')).toBe('/invoices/123Xjson')
+    expect(routes.path('/invoices/123.json')).toBe('/invoices/[id].json')
+  })
+
   it.each([5, 4, 1])('matches a path encoded %i times', (times) => {
     let encoded = '/123'
     for (let i = 0; i < times; i++) encoded = encodeURIComponent(encoded)
