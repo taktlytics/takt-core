@@ -2,4 +2,4 @@
 "@vskstudio/takt-core": patch
 ---
 
-Route redaction matches the paths the same way as the PHP SDK: case-insensitive, decoded repeatedly, dot segments and repeated slashes normalized, matrix parameters ignored. A path that cannot be decoded is masked as `/[redacted]` when a route is configured. When a path is masked, its query string and fragment are dropped too.
+Route redaction matches paths case-insensitively, decodes them repeatedly (up to five changes), normalizes dot segments and repeated slashes, and ignores matrix parameters, the same way takt-core-php does. One difference: a path that cannot be decoded is masked as `/[redacted]` when a route is configured, while the PHP SDK keeps it raw. When a path is masked, its query string and fragment are dropped too.
