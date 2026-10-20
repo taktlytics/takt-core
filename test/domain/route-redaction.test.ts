@@ -168,6 +168,19 @@ describe('createRouteRedaction', () => {
         'https://example.com/[redacted]',
       )
       expect(routes.outboundDestination('https://partner.io/users/42', PAGE)).toBe('https://partner.io/users/42')
+      expect(routes.outboundDestination('https://www.example.com/download/tok123', PAGE)).toBe(
+        'https://www.example.com/download/tok123',
+      )
+    })
+
+    it('masks an outbound link on the page host whatever the trailing dot of either host', () => {
+      const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/x' })
+      expect(routes.outboundDestination('https://example.com./download/tok123', PAGE)).toBe(
+        'https://example.com./[redacted]',
+      )
+      expect(routes.outboundDestination('https://example.com/download/tok123', 'https://example.com./verify/abc')).toBe(
+        'https://example.com/[redacted]',
+      )
     })
 
     it('stays off without a resolver or when the flag is false', () => {

@@ -296,6 +296,10 @@ function hasOverlongConstrainedSegment(route: CompiledRoute, candidate: string):
   return match !== null && match.slice(1).some((group) => group !== undefined && group.length > MAX_CONSTRAINED_SEGMENT_BYTES)
 }
 
+function withoutTrailingDot(hostname: string): string {
+  return hostname.replace(/\.$/, '')
+}
+
 function parseUrl(raw: string): URL | null {
   try {
     return new URL(raw)
@@ -352,7 +356,8 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
   }
 
   function sameHost(url: URL, pageUrl: string): boolean {
-    return parseUrl(pageUrl)?.hostname === url.hostname
+    const page = parseUrl(pageUrl)
+    return page !== null && withoutTrailingDot(page.hostname) === withoutTrailingDot(url.hostname)
   }
 
   function siteRoot(raw: string): string {
