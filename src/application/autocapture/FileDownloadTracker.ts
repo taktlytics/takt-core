@@ -1,14 +1,12 @@
 import type { ClickSource } from '../ports/ClickSource'
 import type { TrackOptions } from '../Analytics'
 import type { UrlScrubber } from '../../domain/url/UrlScrubber'
+import { DEFAULT_DOWNLOAD_EXTENSIONS } from '../../domain/download/defaultExtensions'
 
 export class FileDownloadTracker {
-  static readonly DEFAULT_EXTENSIONS = [
-    'pdf', 'zip', 'dmg', 'xlsx', 'csv', 'doc', 'docx', 'ppt', 'pptx',
-    'rar', '7z', 'gz', 'mp3', 'mp4', 'wav', 'avi', 'mov',
-  ]
+  static readonly DEFAULT_EXTENSIONS = DEFAULT_DOWNLOAD_EXTENSIONS
 
-  private readonly exts: string[]
+  private readonly exts: readonly string[]
 
   constructor(
     private readonly clickSource: ClickSource,
