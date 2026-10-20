@@ -142,44 +142,73 @@ function escapeRegExp(text: string): string {
 
 const CONSTRAINT = /<([^>]*)>/
 const MAX_CONSTRAINED_SEGMENT_BYTES = 256
+const MAX_ROUTE_VARIABLE_QUANTIFIERS = 2
+const MAX_SEGMENT_VARIABLE_QUANTIFIERS = 2
+const BYTE_OFFSET = 0xe000
 const encoder = new TextEncoder()
 
 interface BuildState {
   unusable: boolean
+  variables: number
 }
 
-type BuildMode = 'strict' | 'loose'
+function toByteString(text: string): string {
+  return Array.from(encoder.encode(text), (byte) => String.fromCharCode(byte < 0x80 ? byte : BYTE_OFFSET + byte)).join('')
+}
 
-function paramSource(param: string, mode: BuildMode, state: BuildState): string {
-  const body = param.startsWith('{') ? CONSTRAINT.exec(param)?.[1] : undefined
-  if (body === undefined) return '[^/]+'
+function constraintBody(param: string): string | undefined {
+  return param.startsWith('{') ? CONSTRAINT.exec(param)?.[1] : undefined
+}
+
+type BuildMode = 'strict' | 'loose' | 'shape'
+
+interface ParamPiece {
+  source: string
+  variables: number
+  constrained: boolean
+}
+
+function paramSource(param: string, mode: BuildMode, state: BuildState): ParamPiece {
+  if (mode === 'shape') return { source: '[^/]+', variables: 0, constrained: false }
+  const body = constraintBody(param)
+  if (body === undefined) return { source: '[^/]+', variables: 1, constrained: false }
   const constraint = compileConstraint(body)
   if (constraint === null) {
     state.unusable = true
-    return '[^/]+'
+    return { source: '[^/]+', variables: 1, constrained: true }
   }
-  return mode === 'strict' ? `(?:${constraint})` : '([^/]+)'
+  state.variables += constraint.variables
+  return {
+    source: mode === 'strict' ? `(?:${constraint.source})` : '([^/]+)',
+    variables: constraint.variables,
+    constrained: true,
+  }
 }
 
 function segmentSource(segment: string, mode: BuildMode, state: BuildState): string {
-  if (STRAY_BRACE.test(segment.replace(PARAM, ''))) {
+  const params = [...segment.matchAll(PARAM)]
+  if (mode === 'shape' && (params.length > 1 || STRAY_BRACE.test(segment.replace(PARAM, '')))) return '[^/]+'
+  const pieces = params.map((param) => paramSource(param[0], mode, state))
+  const constrainedCount = pieces.filter((piece) => piece.constrained).length
+  const variables = pieces.reduce((sum, piece) => sum + piece.variables, 0)
+  if (STRAY_BRACE.test(segment.replace(PARAM, '')) || constrainedCount > 1 || variables > MAX_SEGMENT_VARIABLE_QUANTIFIERS) {
     state.unusable = true
     return '[^/]+'
   }
   let source = ''
   let last = 0
-  for (const param of segment.matchAll(PARAM)) {
-    source += escapeRegExp(segment.slice(last, param.index)) + paramSource(param[0], mode, state)
+  params.forEach((param, index) => {
+    source += escapeRegExp(toByteString(segment.slice(last, param.index))) + pieces[index].source
     last = param.index + param[0].length
-  }
-  return source + escapeRegExp(segment.slice(last))
+  })
+  return source + escapeRegExp(toByteString(segment.slice(last)))
 }
 
 function buildSource(segments: string[], mode: BuildMode, state: BuildState): string {
   return segments
     .map((segment) => {
       if (REST.test(segment)) return '(?:/.*)?'
-      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment, mode, state)})?`
+      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment, mode, state).source})?`
       return '/' + segmentSource(segment, mode, state)
     })
     .join('')
@@ -193,19 +222,21 @@ interface CompiledRoute {
 
 function compileRoute(pattern: string): CompiledRoute {
   const segments = routeSegments(pattern)
-  const state: BuildState = { unusable: false }
+  const state: BuildState = { unusable: false, variables: 0 }
   const source = buildSource(segments, 'strict', state)
-  const loose = buildSource(segments, 'loose', { unusable: false })
+  const loose = buildSource(segments, 'loose', { unusable: false, variables: 0 })
+  const shape = buildSource(segments, 'shape', { unusable: false, variables: 0 })
+  const unusable = state.unusable || state.variables > MAX_ROUTE_VARIABLE_QUANTIFIERS
   return {
-    regex: new RegExp(`^${source}/?$`, 'i'),
+    regex: new RegExp(`^${unusable ? shape : source}/?$`, 'i'),
     loose: new RegExp(`^${loose}/?$`, 'i'),
-    unusable: state.unusable,
+    unusable,
   }
 }
 
 function hasOverlongConstrainedSegment(route: CompiledRoute, candidate: string): boolean {
   const match = route.loose.exec(candidate)
-  return match !== null && match.slice(1).some((group) => group !== undefined && encoder.encode(group).byteLength > MAX_CONSTRAINED_SEGMENT_BYTES)
+  return match !== null && match.slice(1).some((group) => group !== undefined && group.length > MAX_CONSTRAINED_SEGMENT_BYTES)
 }
 
 function parseUrl(raw: string): URL | null {
@@ -227,8 +258,9 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
 
   function redactedPath(pathname: string): string | null {
     if (routes.length === 0) return null
-    const candidates = candidatePaths(pathname, decodeStep)
-    if (candidates === null) return FAILED_OUTPUT
+    const decoded = candidatePaths(pathname, decodeStep)
+    if (decoded === null) return FAILED_OUTPUT
+    const candidates = decoded.map(toByteString)
     for (const route of routes) {
       if (candidates.some((candidate) => hasOverlongConstrainedSegment(route, candidate))) return FAILED_OUTPUT
       if (candidates.some((candidate) => route.regex.test(candidate))) return route.unusable ? FAILED_OUTPUT : route.output

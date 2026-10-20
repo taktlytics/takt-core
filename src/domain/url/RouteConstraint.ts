@@ -15,7 +15,12 @@ interface Cursor {
   variableQuantifiers: number
 }
 
-export default function compileConstraint(body: string): string | null {
+export interface CompiledConstraint {
+  readonly source: string
+  readonly variables: number
+}
+
+export default function compileConstraint(body: string): CompiledConstraint | null {
   if (body.length === 0 || body.length > MAX_CONSTRAINT_LENGTH) return null
   if (!PRINTABLE_ASCII.test(body)) return null
   const cursor: Cursor = { text: body, index: 0, variableQuantifiers: 0 }
@@ -27,7 +32,7 @@ export default function compileConstraint(body: string): string | null {
   } while (consumeAlternation(cursor))
   if (cursor.variableQuantifiers > MAX_VARIABLE_QUANTIFIERS) return null
   const source = branches.join('|')
-  return isValidSource(source) ? source : null
+  return isValidSource(source) ? { source, variables: cursor.variableQuantifiers } : null
 }
 
 function consumeAlternation(cursor: Cursor): boolean {

@@ -157,3 +157,105 @@ describe('grammaire des contraintes : temps borné sur 256 caractères', () => {
     expect(performance.now() - start).toBeLessThan(BUDGET_MS)
   })
 })
+
+describe('bornes par route et par segment', () => {
+  it('rejette 3 quantificateurs variables répartis sur la route', () => {
+    expect(mask('/x/{a<a*>}/{b<a*>}/{c<a*>}', '/x/a/a/a')).toBe('/[redacted]')
+  })
+
+  it('accepte 2 quantificateurs variables répartis sur la route', () => {
+    expect(mask('/x/{a<a*>}/{b<a*>}', '/x/a/a')).toBe('/x/{a}/{b}')
+  })
+
+  it('rejette 2 paramètres contraints adjacents dans un même segment', () => {
+    expect(mask('/x/{a<\\d>}{b<\\d>}', '/x/12')).toBe('/[redacted]')
+  })
+
+  it('rejette 6 paramètres contraints adjacents, rapidement', () => {
+    const start = performance.now()
+    expect(mask('/x/{a<a*>}{b<a*>}{c<a*>}{d<a*>}', `/x/${'a!'.repeat(200)}`)).toBe('/[redacted]')
+    expect(performance.now() - start).toBeLessThan(BUDGET_MS)
+  })
+
+  it('rejette 4 paramètres non contraints adjacents, rapidement', () => {
+    const start = performance.now()
+    expect(mask('/x/{a}{b}{c}{d}', `/x/${'a'.repeat(200)}!`)).toBe('/[redacted]')
+    expect(performance.now() - start).toBeLessThan(BUDGET_MS)
+    const failing = performance.now()
+    expect(mask('/x/{a}{b}{c}{d}', `/x/${'a'.repeat(200)}/b`)).toBe(`/x/${'a'.repeat(200)}/b`)
+    expect(performance.now() - failing).toBeLessThan(BUDGET_MS)
+  })
+
+  it('rejette 3 quantificateurs variables dans un même segment', () => {
+    expect(mask('/x/{a<\\w*\\w*>}{b}', '/x/aa')).toBe('/[redacted]')
+  })
+
+  it('accepte deux paramètres non contraints dans un même segment', () => {
+    expect(mask('/x/{a}{b}', '/x/ab')).toBe('/x/{a}{b}')
+  })
+
+  it('pire cas accepté : 2 quantificateurs variables sur 256 octets, sous 50 ms', () => {
+    const start = performance.now()
+    expect(mask('/x/{a<\\w*\\w*>}', `/x/${LONG}`)).toBe(`/x/${LONG}`)
+    expect(performance.now() - start).toBeLessThan(BUDGET_MS)
+  })
+})
+
+describe('parité octets UTF-8 (PCRE sans u)', () => {
+  it('.{2} correspond à é, qui fait 2 octets', () => {
+    expect(mask('/x/{id<.{2}>}', '/x/é')).toBe('/x/{id}')
+  })
+
+  it('.{2} ne correspond pas à un emoji, qui fait 4 octets', () => {
+    expect(mask('/x/{id<.{2}>}', '/x/🙂')).toBe('/x/🙂')
+  })
+
+  it('.{2} correspond au NBSP, qui fait 2 octets', () => {
+    expect(mask('/x/{id<.{2}>}', '/x/ ')).toBe('/x/{id}')
+  })
+
+  it('[^a]{2} correspond à é', () => {
+    expect(mask('/x/{id<[^a]{2}>}', '/x/é')).toBe('/x/{id}')
+  })
+
+  it('\\s ne correspond pas au NBSP', () => {
+    expect(mask('/x/{id<\\s>}', '/x/ ')).toBe('/x/ ')
+  })
+
+  it('\\s correspond à l\'espace ASCII', () => {
+    expect(mask('/x/{id<\\s>}', '/x/ ')).toBe('/x/{id}')
+  })
+
+  it('\\S{2}, \\W{2} et \\D{2} voient les octets de é', () => {
+    expect(mask('/x/{id<\\S{2}>}', '/x/é')).toBe('/x/{id}')
+    expect(mask('/x/{id<\\W{2}>}', '/x/é')).toBe('/x/{id}')
+    expect(mask('/x/{id<\\D{2}>}', '/x/é')).toBe('/x/{id}')
+  })
+
+  it('une littérale Ã (C3 83) ne se replie pas sur l\'octet E3 de ッ (E3 83 83)', () => {
+    expect(mask('/x/Ã{p}', '/x/ッ')).toBe('/x/ッ')
+  })
+})
+
+describe('forme des routes inutilisables', () => {
+  it('masque le chemin de même forme quand une autre contrainte de la route est invalide', () => {
+    expect(mask('/x/{p<\\d>}/{q<[z-a]>}', '/x/abc/q')).toBe('/[redacted]')
+  })
+
+  it.each([
+    ['[\\d-z]'],
+    ['a{3,2}'],
+    ['\\/'],
+    ['a\u0001'],
+  ])('une contrainte invalide %s rend la route entière inutilisable', (constraint) => {
+    expect(mask(`/x/{p<\\d>}/{q<${constraint}>}`, '/x/abc/q')).toBe('/[redacted]')
+  })
+
+  it('. se compile en [^/] : le saut de ligne est un octet ordinaire', () => {
+    expect(mask('/x/{p<.{3}>}', '/x/a%0Ab')).toBe('/x/{p}')
+  })
+
+  it('une contrainte en ligne reste dans la regex de route', () => {
+    expect(mask('/x/{p<\\d+>}x{q}', '/x/1x2x3')).toBe('/x/{p}x{q}')
+  })
+})
