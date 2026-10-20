@@ -3,7 +3,7 @@
 # @vskstudio/takt-core
 
 
-> 📚 **Documentation** — [taktlytics.com/docs/wrappers/core](https://taktlytics.com/docs/wrappers/core)
+> 📚 **Documentation**: [taktlytics.com/docs/wrappers/core](https://taktlytics.com/docs/wrappers/core)
 
 **Tiny, privacy-friendly analytics SDK for Takt.**
 
@@ -19,7 +19,7 @@
 - **Zero dependencies**, tree-shakeable ESM module.
 - **~1 kB gzip** drop-in snippet. No build step required.
 - **Privacy first**: honours opt-out and Do Not Track, strips query strings, and excludes localhost / private IPs by default.
-- **Hexagonal core**: a pure domain wrapped in ports & adapters — easy to test, easy to extend.
+- **Hexagonal core**: a pure domain wrapped in ports & adapters. It is easy to test and easy to extend.
 
 ## Snippet (no build step)
 
@@ -27,7 +27,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@vskstudio/takt-core/dist/takt.js" data-domain="example.com"></script>
 ```
 
-> Pin a version in production, e.g. `@vskstudio/takt-core@0.5.0`. jsDelivr and unpkg both serve the snippet straight from npm — no extra hosting required.
+> Pin a version in production, e.g. `@vskstudio/takt-core@0.5.0`. jsDelivr and unpkg both serve the snippet straight from npm. No extra hosting is required.
 
 Then, anywhere on the page:
 
@@ -35,7 +35,7 @@ Then, anywhere on the page:
 window.takt('Signup', { props: { plan: 'pro' } })
 ```
 
-Calls made before the script finishes loading are queued and replayed — install a tiny stub first if you need that:
+Calls made before the script finishes loading are queued and replayed. Install a tiny stub first if you need that:
 
 ```html
 <script>
@@ -48,12 +48,12 @@ Calls made before the script finishes loading are queued and replayed — instal
 | Attribute | Effect | Default |
 | --- | --- | --- |
 | `data-domain` | Site identifier sent with every event | `location.hostname` |
-| `data-script-origin` | First-party origin to derive the endpoint from (`{origin}/api/event`) — a custom domain you proxy through to dodge ad-blockers | hosted Takt origin |
+| `data-script-origin` | First-party origin to derive the endpoint from (`{origin}/api/event`): a custom domain you proxy through to dodge ad-blockers | hosted Takt origin |
 | `data-endpoint` | Ingestion endpoint (wins over `data-script-origin`); set `/api/event` for a same-origin first-party proxy | `https://taktlytics.com/api/event` |
 | `data-exclude-localhost="false"` | Track localhost / private IPs | excluded |
-| `data-enabled="false"` | Kill-switch — the tracker does nothing | enabled |
+| `data-enabled="false"` | Kill-switch: the tracker does nothing | enabled |
 | `data-respect-dnt="false"` | Opt out of the Do Not Track short-circuit | respected |
-| `data-sample-rate="0.5"` | Send only this fraction (0–1) of events | `1` (all) |
+| `data-sample-rate="0.5"` | Send only this fraction (0 to 1) of events | `1` (all) |
 | `data-track-query` | Keep the full query string and hash (default strips both) | stripped |
 | `data-query-params="utm_source,utm_medium"` | Keep only these query params | none |
 
@@ -61,7 +61,7 @@ The base snippet stays around **1 kB gzip**: pageviews, SPA navigation, `window.
 
 The base snippet has neither `exclude` nor `redactRoutes`: its pageviews send the real path of every page, including `/verify/abc123`. Use the npm SDK when a route must never reach analytics. Browsers that send `Sec-GPC: 1` (Global Privacy Control) are still honoured: the ingest drops their events.
 
-### Auto extensions — `takt.auto.js`
+### Auto extensions: `takt.auto.js`
 
 Need outbound clicks, file downloads, HTML-declared events, or 404 detection without writing code? Swap `takt.js` for the opt-in `takt.auto.js` bundle and list what you want in `data-auto`:
 
@@ -81,10 +81,11 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 | `404` | `404` | `path` |
 | `tagged` | custom (`data-takt-event`) | from `data-takt-prop-*` |
 
-- **downloads** default extensions: `pdf, xlsx, docx, pptx, csv, zip, gz, rar, 7z, dmg, exe, apk, mp3, mp4, wav, mov, avi, mkv, txt` — override with `data-downloads-ext="pdf,csv,epub"`.
+- **downloads** default extensions: `pdf, xlsx, docx, pptx, csv, zip, gz, rar, 7z, dmg, exe, apk, mp3, mp4, wav, mov, avi, mkv, txt`. Override with `data-downloads-ext="pdf,csv,epub"`.
 - **tagged**: add `data-takt-event="Cta"` to any clickable element; `data-takt-prop-<key>` attributes become props (empty keys/values are ignored). The reserved name `pageview` is refused. Identical to `init({ tagged: true })` on the SDK.
 - **404**: detected at load via the Navigation Timing API, or by adding `data-takt-404` to `<body>` / a `<meta name="takt:404">` tag on server-rendered error pages.
 - **data-redact-routes**: comma-separated route patterns (`data-redact-routes="/reset/[token],/verify/[token]"`), same syntax as `redactRoutes`. Applied to the pageview and SPA navigation path, the `404` path, and the `Outbound Link: Click` and `File Download` destinations (matched on their path, whatever the host). The base `takt.js` alone has no redaction: a route with a secret in its path needs `takt.auto.js` with this attribute, or the npm SDK's `redactRoutes`. When `takt.js` is loaded first, the pageview it already sent is not redacted; only navigation after `takt.auto.js` runs is masked, so load `takt.auto.js` alone on pages that carry a secret route.
+- **data-redact-undecodable-paths**: only the literal `"false"` decodes a path that cannot be decoded leniently (invalid escapes kept) and matches it, instead of sending `/[redacted]`. Any other value, or no attribute, keeps the masking (default: masked when a route is configured). See [Route redaction](#route-redaction).
 
 ## npm
 
@@ -92,7 +93,7 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 pnpm add @vskstudio/takt-core
 ```
 
-### Quick start — default instance
+### Quick start: default instance
 
 ```ts
 import { init, track, pageview } from '@vskstudio/takt-core'
@@ -107,9 +108,9 @@ track('Signup', {
 
 `init()` creates a single shared instance, fires an automatic pageview, and wires SPA navigation. `track` and `pageview` delegate to it. `optOut`, `optIn`, and `isOptedOut` work with or without it (see [Privacy](#privacy)).
 
-Autocapture toggles — `outbound`, `files`, `notFound`, and `tagged` — opt into the same extensions as the snippet's `data-auto`: outbound-link clicks, file downloads, 404 detection, and `data-takt-event` custom events. `tagged: true` tracks clicks on elements carrying `data-takt-event` (with `data-takt-prop-*` becoming props), matching `data-auto=tagged`.
+The autocapture toggles `outbound`, `files`, `notFound`, and `tagged` opt into the same extensions as the snippet's `data-auto`: outbound-link clicks, file downloads, 404 detection, and `data-takt-event` custom events. `tagged: true` tracks clicks on elements carrying `data-takt-event` (with `data-takt-prop-*` becoming props), matching `data-auto=tagged`.
 
-### Instance API — `createTakt`
+### Instance API: `createTakt`
 
 For full control (multiple instances, no globals, explicit teardown), construct an instance directly:
 
@@ -145,9 +146,9 @@ stopTagged()
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `domain` | `string` | `location.hostname` | Site identifier sent with every event |
-| `scriptOrigin` | `string` | hosted Takt origin | First-party origin to derive the endpoint from (`{origin}/api/event`) — a custom domain you proxy through to dodge ad-blockers |
+| `scriptOrigin` | `string` | hosted Takt origin | First-party origin to derive the endpoint from (`{origin}/api/event`): a custom domain you proxy through to dodge ad-blockers |
 | `endpoint` | `string` | `https://taktlytics.com/api/event` | Ingestion endpoint (wins over `scriptOrigin`); set `/api/event` for a same-origin first-party proxy |
-| `enabled` | `boolean` | `true` | Master switch — when `false`, nothing is sent |
+| `enabled` | `boolean` | `true` | Master switch: when `false`, nothing is sent |
 | `debug` | `boolean` | `false` | Log each payload to the console before sending |
 | `sampleRate` | `number` | `1` | Keep this fraction of events (e.g. `0.25` ≈ 25%) |
 | `respectDnt` | `boolean` | `true` | Suppress events when Do Not Track is on |
@@ -157,12 +158,13 @@ stopTagged()
 | `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
 | `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
 | `redactRoutes` | `string[]` | — | Route patterns whose real path is replaced by the pattern (e.g. `['/verify/[token]']` sends `/verify/[token]`). See [Route redaction](#route-redaction) |
+| `redactUndecodablePaths` | `boolean` | `true` | When a route is configured, a path that cannot be decoded is sent as `/[redacted]`; `false` decodes it leniently and matches it, as takt-core-php does |
 | `routeTemplates` | `boolean` | `false` | Send every URL as its route template instead of the real path. Needs a `routeTemplate` resolver; the framework wrappers provide one |
 | `routeTemplate` | `() => string \| null` | — | Returns the current route template (`/blog/[slug]`, `/users/:id`). Used when `routeTemplates` is on |
 
 ### Privacy
 
-By default the query string and hash are stripped from every URL (page, referrer, and autocaptured link destinations) before sending — secrets in `?token=…` or `#access_token=…` never leave the browser. Opt back in with `trackQuery: true`, narrow it with a `queryParams` allowlist, or take full control with `scrubUrl`. Props and revenue are sanitized too: props are coerced to strings, capped (30 keys, 64-char keys, 1024-char values), and revenue is dropped unless the amount and 3-letter currency are well-formed.
+By default the query string and hash are stripped from every URL (page, referrer, and autocaptured link destinations) before sending. Secrets in `?token=…` or `#access_token=…` never leave the browser. Opt back in with `trackQuery: true`, narrow it with a `queryParams` allowlist, or take full control with `scrubUrl`. Props and revenue are sanitized too: props are coerced to strings, capped (30 keys, 64-char keys, 1024-char values), and revenue is dropped unless the amount and 3-letter currency are well-formed.
 
 ```ts
 import { optOut, optIn, isOptedOut } from '@vskstudio/takt-core'
@@ -184,7 +186,27 @@ Query strings are stripped by default, but path segments are sent as they are: `
 createTakt({ redactRoutes: ['/verify/[token]', '/reset/:code', '/invoices/[id].pdf'] })
 ```
 
-`redactRoutes` lists the sensitive routes. A matching path is sent as the pattern (`/verify/[token]`), every other path keeps its real value, so per-page stats stay intact. Patterns accept SvelteKit / Astro / Next syntax (`[param]`, `[[optional]]`, `[...rest]`, `(group)`) and Vue / React / Angular / Solid syntax (`:param`, `:param?`, `*`, `**`). The rule covers the page URL, same-origin referrers, outbound link destinations and download links (matched on their path, whatever the host), and 404 paths.
+`redactRoutes` lists the sensitive routes. A matching path is sent as the pattern (`/verify/[token]`), every other path keeps its real value, so per-page stats stay intact. Patterns accept SvelteKit / Astro / Next syntax (`[param]`, `[[optional]]`, `[...rest]`, `(group)`), Vue / React / Angular / Solid syntax (`:param`, `:param?`, `*`, `**`) and the Laravel / Symfony braces of the PHP SDK (`{param}`, `{param?}`, `{param<regex>}`). A brace parameter with a `<regex>` constraint (`{id<\d+>}`) only matches a segment that satisfies it, anchored on the whole segment and never crossing `/`. The constraint is not a free regular expression: it must follow this grammar, checked character by character:
+- Only printable ASCII is allowed: any non-ASCII or control character refuses the constraint.
+- `constraint := branch ('|' branch)*` and `branch := piece+`, where `piece := atom quantifier?`. Alternation exists only at the top level, and an empty branch is refused.
+- `atom` is a literal (any character except `( ) [ ] { } | * + ? . \ ^ $ / < >`), `.` (any character but `/`), an escape `\d \D \w \W \s \S`, `\` followed by an ASCII punctuation character other than `/`, or a class `[...]`. `\0` and `\` followed by a digit are refused.
+- A class takes an optional `^` at its start only, and contains the same literals as outside a class (so `.`, `$`, `(`, `{`, `}`, `|`, `^`, `*`, `+`, `?`, `/` are refused). A `-` is literal only at the start or end of the class, or inside a range such as `a-z` whose two ends are literals. A range must go up (`[z-a]` is refused) and cannot end on `-`. So `[\d-z]`, `[a-\d]`, `[--a]`, `[!--]` are refused. A class cannot be empty (`[]`, and `[]a]` is refused) or nested.
+- `quantifier` is `*`, `+`, `?`, `{n}`, `{n,}` or `{n,m}`, with n ≤ m ≤ 100. Lazy (`*?`) and possessive (`*+`) forms and stacked quantifiers are refused.
+- The constraint is 1 to 100 characters long and has at most two variable quantifiers (`{n}` does not count, `{n,n}` does, so `[0-9a-f]{8}-[0-9a-f]{4}` is fine). Matching is case-insensitive.
+- `.` matches any byte except `/`, as `[^/]`. `\s` and `\S` are ASCII-only (space, tab, newline, vertical tab, form feed, carriage return). Matching runs on the UTF-8 bytes of the decoded segment, one character per byte, as PCRE without the `u` flag: `é` is two bytes, so `.{2}` matches `é` and `.{2}` does not match an emoji.
+- Bounds per route and per segment: a route has at most two variable quantifiers in total, and a segment holds at most one constrained parameter and at most two variable quantifiers. Each segment adds its variable quantifiers minus one (parameters without a constraint and an optional `{x?}` count too: a segment with a single plain parameter adds nothing, while an optional `{x?}` adds one), and the sum over the route must stay at most 1, so `/{a}{b}/{c}` is accepted and `/{a}{b}/{c}{d}` is not. A route has at most one catch-all segment (`**`, `*name`, `:name*`, `:name+`, `[...name]`). A route over any of these bounds is unusable.
+- A constraint outside this grammar makes the route unusable: every matching path is masked as `/[redacted]`, never sent raw. A brace segment the parser cannot read (for example `{id<[>]>}`) is treated the same way. A constrained segment longer than 256 UTF-8 bytes is masked as `/[redacted]` too.
+An unusable route is matched by its shape instead, with every parameter as a wildcard, so a path of the same shape is masked as `/[redacted]`: `/x/{p<\d>}/{q<[z-a]>}` masks `/x/abc/q`. Inline examples: `/x/{p<\d+>}x{q}` on `/x/1x2x3` gives `/x/{p}x{q}`, and `{p<.{3}>}` on `/x/a%0Ab` gives `/x/{p}`. Refused constraints include `[z-a]`, `[\d-z]`, `a{3,2}`, `\/` and control characters.
+
+Examples: `\d+`, `[a-z0-9-]+`, `[0-9a-f]{8}`, `fr|en`. The same grammar must apply in takt-core-php, so both SDKs mask the same paths. The rule covers the page URL, same-origin referrers, outbound link destinations and download links (matched on their path, whatever the host), and 404 paths.
+
+Matching is case-insensitive: `/Orders/123` matches `/orders/[id]`.
+
+The path is decoded again and again until it stops changing, with at most five changes, so `/orders%252F123` also matches `/orders/[id]`. Each decoded form is compared. Dot segments (`.` and `..`, encoded or not) are resolved as RFC 3986 specifies, repeated slashes are collapsed, and matrix parameters (`;a=1`) are dropped from each segment before the comparison.
+
+A path that cannot be decoded (a malformed `%` escape or invalid UTF-8) is sent as `/[redacted]` when at least one route is configured, so the browser never sends a path it could not check. Without a route, such a path is sent unchanged. Set `redactUndecodablePaths: false` (or `data-redact-undecodable-paths="false"` on `takt.auto.js`) to decode it leniently instead, as takt-core-php does: an invalid escape stays as written and the path is still matched against the routes. An invalid byte glued to a route literal (for example `/%FForders/123` with the route `/orders/[id]`) does not match and is sent raw, as in takt-core-php. Keep the default `true` for a guaranteed masking. A path that still changes after five decoding passes is masked as `/[redacted]` whatever the option.
+
+When a path is masked, its query string and fragment are dropped with it, so a token in `?token=` never leaves the browser.
 
 ```ts
 createTakt({ routeTemplates: true, routeTemplate: () => currentRoute.id })
@@ -192,7 +214,7 @@ createTakt({ routeTemplates: true, routeTemplate: () => currentRoute.id })
 
 `routeTemplates: true` sends every page as its route template: `/blog/hello` becomes `/blog/[slug]`. It suits fully private apps where no path is worth reading as is; on a public site it merges every article into one row. The core cannot know the router, so it needs a `routeTemplate` resolver, and the framework wrappers wire it for you. When a resolver returns nothing (no matched route), `redactRoutes` still applies and the real path is sent otherwise. This fallback is fail-open by design: a page the resolver cannot match, and no pattern covers, is sent with its real path. Outbound link destinations never use the resolver, since it describes the current page, not the link. Same-origin referrers are reduced to the site origin in this mode, since their template is unknown.
 
-## Server-side events — `@vskstudio/takt-core/server`
+## Server-side events: `@vskstudio/takt-core/server`
 
 Send pageviews and events from Node (visitors without JavaScript, crawlers, webhooks, queued jobs) with the same payload rules as the browser SDK:
 
@@ -220,9 +242,10 @@ await takt.event('Purchase', {
 | --- | --- | --- | --- |
 | `domain` | `string` | required | Site identifier, must match the site of the API key |
 | `apiKey` | `string` | — | Site API key with `events:write`, sent as `Authorization: Bearer` |
-| `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()`. Must be `https://`; `http://` is accepted only for `localhost`, `127.0.0.1` and `[::1]`, and any other `http://` endpoint throws at construction |
+| `endpoint` / `scriptOrigin` | `string` | hosted Takt origin | Same resolution as `createTakt()`. Must be `https://`: any `http://` endpoint throws at construction, loopback included (breaking change: `localhost`, `127.0.0.1` and `[::1]` used to be accepted over http) |
 | `trackQuery` / `queryParams` / `scrubUrl` | | query stripped | Same URL scrubbing as the browser SDK, applied to `url` and `referrer` |
 | `redactRoutes` | `string[]` | — | Same route patterns as the browser SDK. A `route` passed to `pageview()` / `event()` replaces the path of that call |
+| `redactUndecodablePaths` | `boolean` | `true` | Same option as the browser SDK |
 | `strict` | `boolean` | `false` | Throw on network errors and non-`202` answers instead of swallowing them |
 | `fetch` | `typeof fetch` | global `fetch` | Custom fetch implementation (Node 18+ ships one) |
 
@@ -252,7 +275,7 @@ await stats.breakdown('page')
 ```
 
 `host` defaults to the hosted Takt origin, matching the SDK's ingest default.
-When set, it must be an absolute `http(s)://` origin — anything else
+When set, it must be an absolute `http(s)://` origin. Anything else
 (`javascript:`, `data:`, protocol-relative `//…`) is rejected, so a `host`
 value can never smuggle a non-http scheme into a widget `src` or a `fetch`.
 The value is reduced to its origin: any path, query, or fragment is dropped
@@ -261,7 +284,7 @@ Errors surface as `PublicApiError` (carrying the HTTP `status`).
 
 ## Wire payload contract
 
-Every event is posted to the endpoint as a compact JSON object. The keys are frozen — the Takt backend ingestion depends on them:
+Every event is posted to the endpoint as a compact JSON object. The keys are frozen: the Takt backend ingestion depends on them:
 
 | Key | Meaning |
 | --- | --- |
@@ -281,7 +304,7 @@ Every event is posted to the endpoint as a compact JSON object. The keys are fro
 domain/          Pure business core, zero I/O. Value objects (EventName, Props,
                  Revenue, AnalyticsEvent), payload mapping, and the URL scrubber.
 application/      Use cases: the Analytics service, the TrackingPolicy (consent +
-                 sampling), and autocapture trackers — depending only on small
+                 sampling), and autocapture trackers, which depend only on small
                  single-method port interfaces.
 infrastructure/   Driven adapters: a resilient fetch/beacon transport, localStorage
                  consent, and browser providers (DNT, environment, history, clicks).

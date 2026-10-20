@@ -26,6 +26,7 @@ export interface Config {
   queryParams?: string[]
   scrubUrl?: UrlScrubber
   redactRoutes?: string[]
+  redactUndecodablePaths?: boolean
   routeTemplates?: boolean
   routeTemplate?: RouteTemplateResolver
 }
@@ -63,6 +64,7 @@ export function createTakt(config: Config = {}): Analytics {
     }),
     routes: createRouteRedaction({
       redactRoutes: config.redactRoutes,
+      redactUndecodablePaths: config.redactUndecodablePaths,
       routeTemplates: config.routeTemplates,
       routeTemplate: config.routeTemplate,
     }),

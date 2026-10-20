@@ -46,11 +46,25 @@ describe('createServerTakt', () => {
       .toThrow('must use https')
   })
 
-  it('accepts http on localhost, 127.0.0.1 and [::1]', () => {
+  it('refuses http on localhost, 127.0.0.1 and [::1] too', () => {
     const { fetch } = fakeFetch()
     for (const endpoint of ['http://localhost:8080/api/event', 'http://127.0.0.1:8080/api/event', 'http://[::1]:8080/api/event']) {
-      expect(() => createServerTakt({ domain: 'example.com', endpoint, fetch })).not.toThrow()
+      expect(() => createServerTakt({ domain: 'example.com', endpoint, fetch })).toThrow('must use https')
     }
+  })
+
+  it('masks an undecodable page path by default', async () => {
+    const { fetch, calls } = fakeFetch()
+    await createServerTakt({ domain: 'example.com', redactRoutes: ['/orders/[id]'], fetch })
+      .pageview({ url: 'https://example.com/orders/%ZZ?token=t' })
+    expect(sentBody(calls[0]).u).toBe('https://example.com/[redacted]')
+  })
+
+  it('matches an undecodable page path leniently when redactUndecodablePaths is false', async () => {
+    const { fetch, calls } = fakeFetch()
+    await createServerTakt({ domain: 'example.com', redactRoutes: ['/orders/[id]'], redactUndecodablePaths: false, fetch })
+      .pageview({ url: 'https://example.com/orders/%ZZ' })
+    expect(sentBody(calls[0]).u).toBe('https://example.com/orders/[id]')
   })
 
   it('falls back to the site home when no url is given', async () => {
