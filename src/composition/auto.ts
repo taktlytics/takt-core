@@ -68,8 +68,3 @@ export function runAuto(el: HTMLScriptElement | null): void {
 
   if (on('404')) new NotFoundTracker(takt, routes.path).enable()
 }
-
-if (typeof document !== 'undefined') {
-  const s = document.currentScript as HTMLScriptElement | null
-  if (s) runAuto(s)
-}
