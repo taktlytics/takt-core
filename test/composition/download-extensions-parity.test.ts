@@ -60,6 +60,14 @@ describe('parité des extensions de téléchargement par défaut', () => {
     delete (window as { takt?: unknown }).takt
   })
 
+  it('la liste partagée contient les 21 extensions attendues dans cet ordre', () => {
+    expect([...DEFAULT_DOWNLOAD_EXTENSIONS]).toEqual([
+      'pdf', 'zip', 'dmg', 'xlsx', 'csv', 'doc', 'docx', 'ppt', 'pptx',
+      'rar', '7z', 'gz', 'mp3', 'mp4', 'wav', 'avi', 'mov',
+      'exe', 'apk', 'mkv', 'txt',
+    ])
+  })
+
   it('takt.auto.js et le SDK suivent exactement la même liste par défaut', () => {
     runAuto(scriptEl({ 'data-domain': 'parity.test', 'data-auto': 'downloads' }))
     beaconMock.mockClear()
