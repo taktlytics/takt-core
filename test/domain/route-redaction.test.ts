@@ -43,7 +43,7 @@ describe('createRouteRedaction', () => {
       ['/orders/{id}', '/orders/123', '/orders/{id}'],
       ['/posts/{page?}', '/posts', '/posts/{page}'],
       ['/posts/{page?}', '/posts/3', '/posts/{page}'],
-      ['/orders/{id<\\d+>}', '/orders/abc', '/orders/{id}'],
+      ['/orders/{id<\\d+>}', '/orders/123', '/orders/{id}'],
       ['/users/{id?<\\d+>}', '/users', '/users/{id}'],
     ])('%s rewrites %s to %s',(pattern, path, expected) => {
       expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(expected)
@@ -59,6 +59,12 @@ describe('createRouteRedaction', () => {
       ['/orders/[id]', '/orders/%2e%2e/123'],
       ['/orders/{id}', '/orders'],
       ['/orders/{id}', '/orders/1/2'],
+      ['/orders/{id<\\d+>}', '/orders/abc'],
+      ['/orders/{id<\\d+>}', '/orders/12a'],
+      ['/x/{id<a|b>}', '/x/ab'],
+      ['/x/{id<a|b>}', '/x/ba'],
+      ['/posts/{page?<\\d+>}', '/posts/abc'],
+      ['/p/{a<\\d+>}-{b}', '/p/x-y'],
     ])('%s leaves %s untouched',(pattern, path) => {
       expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(path)
     })
@@ -330,5 +336,33 @@ describe('parité takt-core-php #8', () => {
   it.each([true, false])('matches a valid encoded path in both modes (redactUndecodablePaths %s)', (strict) => {
     const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: strict })
     expect(routes.path('/orders/%C3%A9')).toBe('/orders/[id]')
+  })
+})
+
+describe('brace constraints', () => {
+  const masks = (pattern: string, path: string) => createRouteRedaction({ redactRoutes: [pattern] }).path(path)
+
+  it('masks only a segment that satisfies the constraint', () => {
+    expect(masks('/x/{id<[a-f]+>}', '/x/ABC')).toBe('/x/{id}')
+    expect(masks('/posts/{page?<\\d+>}', '/posts/3')).toBe('/posts/{page}')
+    expect(masks('/posts/{page?<\\d+>}', '/posts')).toBe('/posts/{page}')
+    expect(masks('/p/{a<\\d+>}-{b}', '/p/12-x')).toBe('/p/{a}-{b}')
+  })
+
+  it('anchors the constraint on the whole segment', () => {
+    expect(masks('/x/{id<a|b>}', '/x/ab')).toBe('/x/ab')
+    expect(masks('/x/{id<a|b>}', '/x/b')).toBe('/x/{id}')
+  })
+
+  it('masks, rather than leaks, when the constraint cannot be used', () => {
+    expect(masks('/x/{id<[>}', '/x/anything')).toBe('/x/{id}')
+    expect(masks('/x/{id<\\d)|(\\w>}', '/x/-')).toBe('/x/{id}')
+    expect(masks('/x/{id<a/b>}', '/x/zzz')).toBe('/x/{id}')
+    expect(masks('/x/{id<^\\d+$>}', '/x/123')).toBe('/x/{id}')
+    expect(masks('/x/{id<>}', '/x/zzz')).toBe('/x/{id}')
+    expect(masks(`/x/{id<${'\\d'.repeat(60)}>}`, '/x/abc')).toBe('/x/{id}')
+    expect(masks('/x/{id<(a+)+b>}', `/x/${'a'.repeat(30)}!`)).toBe('/x/{id}')
+    expect(masks('/x/{id<(a)\\1>}', '/x/ab')).toBe('/x/{id}')
+    expect(masks('/x/{id<(?<=a)b>}', '/x/b')).toBe('/x/{id}')
   })
 })

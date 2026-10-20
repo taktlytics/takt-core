@@ -23,7 +23,7 @@ const PARAM = /\[[^\]]+\]|:\w+(\([^)]*\))?|\{\w+(<[^>]*>)?(\?[^}]*)?\}/g
 const BRACE = /\{(\w+)(<[^>]*>)?(\?[^}]*)?\}/g
 
 function routeSegments(template: string): string[] {
-  return template.split('/').filter((segment) => segment !== '' && !GROUP.test(segment))
+  return template.split(/\/(?![^<]*>)/).filter((segment) => segment !== '' && !GROUP.test(segment))
 }
 
 function canonicalSegment(segment: string): string {
@@ -137,11 +137,30 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const CONSTRAINT = /<([^>]*)>/
+const MAX_CONSTRAINT_LENGTH = 100
+const UNUSABLE_CONSTRAINT = /[/^$]|\(\?<|\\[1-9k]|\([^)]*[*+}]\)[*+{]/
+
+function usableConstraint(body: string): boolean {
+  if (body === '' || body.length > MAX_CONSTRAINT_LENGTH || UNUSABLE_CONSTRAINT.test(body)) return false
+  try {
+    return Boolean(new RegExp(body, 'i')) && Boolean(new RegExp(`^(?:${body})$`, 'i'))
+  } catch {
+    return false
+  }
+}
+
+function paramSource(param: string): string {
+  const body = param.startsWith('{') ? CONSTRAINT.exec(param)?.[1] : undefined
+  if (body === undefined || !usableConstraint(body)) return '[^/]+'
+  return `(?:${body})`
+}
+
 function segmentSource(segment: string): string {
   let source = ''
   let last = 0
   for (const param of segment.matchAll(PARAM)) {
-    source += escapeRegExp(segment.slice(last, param.index)) + '[^/]+'
+    source += escapeRegExp(segment.slice(last, param.index)) + paramSource(param[0])
     last = param.index + param[0].length
   }
   return source + escapeRegExp(segment.slice(last))
@@ -151,7 +170,7 @@ function compileRoute(pattern: string): RegExp {
   const source = routeSegments(pattern)
     .map((segment) => {
       if (REST.test(segment)) return '(?:/.*)?'
-      if (OPTIONAL.test(segment)) return '(?:/[^/]+)?'
+      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment)})?`
       return '/' + segmentSource(segment)
     })
     .join('')
