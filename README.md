@@ -81,7 +81,7 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 | `404` | `404` | `path` |
 | `tagged` | custom (`data-takt-event`) | from `data-takt-prop-*` |
 
-- **downloads** default extensions: `pdf, xlsx, docx, pptx, csv, zip, gz, rar, 7z, dmg, exe, apk, mp3, mp4, wav, mov, avi, mkv, txt`, the same list as the default of the SDK's `enableFiles()`. Override with `data-downloads-ext="pdf,csv,epub"`.
+- **downloads** default extensions: `pdf, zip, dmg, xlsx, csv, doc, docx, ppt, pptx, rar, 7z, gz, mp3, mp4, wav, avi, mov, exe, apk, mkv, txt`, the same list as the default of the SDK's `enableFiles()`. Override with `data-downloads-ext="pdf,csv,epub"`.
 - **tagged**: add `data-takt-event="Cta"` to any clickable element; `data-takt-prop-<key>` attributes become props (empty keys/values are ignored). The reserved name `pageview` is refused. Identical to `init({ tagged: true })` on the SDK.
 - **404**: detected at load via the Navigation Timing API, or by adding `data-takt-404` to `<body>` / a `<meta name="takt:404">` tag on server-rendered error pages.
 - **data-redact-routes**: comma-separated route patterns (`data-redact-routes="/reset/[token],/verify/[token]"`), same syntax as `redactRoutes`. Applied to the pageview and SPA navigation path, the `404` path, and the `Outbound Link: Click` and `File Download` destinations (matched on their path, whatever the host). The base `takt.js` alone has no redaction: a route with a secret in its path needs `takt.auto.js` with this attribute, or the npm SDK's `redactRoutes`. When `takt.js` is loaded first, the pageview it already sent is not redacted; only navigation after `takt.auto.js` runs is masked, so load `takt.auto.js` alone on pages that carry a secret route.
