@@ -150,31 +150,38 @@ function usableConstraint(body: string): boolean {
   }
 }
 
-function paramSource(param: string): string {
-  const body = param.startsWith('{') ? CONSTRAINT.exec(param)?.[1] : undefined
-  if (body === undefined || !usableConstraint(body)) return '[^/]+'
-  return `(?:${body})`
+interface CompileState {
+  unusable: boolean
 }
 
-function segmentSource(segment: string): string {
+function paramSource(param: string, state: CompileState): string {
+  const body = param.startsWith('{') ? CONSTRAINT.exec(param)?.[1] : undefined
+  if (body === undefined) return '[^/]+'
+  if (usableConstraint(body)) return `(?:${body})`
+  state.unusable = true
+  return '[^/]+'
+}
+
+function segmentSource(segment: string, state: CompileState): string {
   let source = ''
   let last = 0
   for (const param of segment.matchAll(PARAM)) {
-    source += escapeRegExp(segment.slice(last, param.index)) + paramSource(param[0])
+    source += escapeRegExp(segment.slice(last, param.index)) + paramSource(param[0], state)
     last = param.index + param[0].length
   }
   return source + escapeRegExp(segment.slice(last))
 }
 
-function compileRoute(pattern: string): RegExp {
+function compileRoute(pattern: string): { regex: RegExp; unusable: boolean } {
+  const state: CompileState = { unusable: false }
   const source = routeSegments(pattern)
     .map((segment) => {
       if (REST.test(segment)) return '(?:/.*)?'
-      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment)})?`
-      return '/' + segmentSource(segment)
+      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment, state)})?`
+      return '/' + segmentSource(segment, state)
     })
     .join('')
-  return new RegExp(`^${source}/?$`, 'i')
+  return { regex: new RegExp(`^${source}/?$`, 'i'), unusable: state.unusable }
 }
 
 function parseUrl(raw: string): URL | null {
@@ -189,7 +196,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
   const routes = (options.redactRoutes ?? [])
     .map((pattern) => pattern.trim())
     .filter(Boolean)
-    .map((pattern) => ({ regex: compileRoute(pattern), output: canonicalRoute(pattern) }))
+    .map((pattern) => ({ ...compileRoute(pattern), output: canonicalRoute(pattern) }))
   const resolver = options.routeTemplates ? options.routeTemplate : undefined
   const templated = typeof resolver === 'function'
   const decodeStep: DecodeStep = options.redactUndecodablePaths === false ? decodeLenient : decodeStrict
@@ -199,7 +206,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     const candidates = candidatePaths(pathname, decodeStep)
     if (candidates === null) return FAILED_OUTPUT
     for (const route of routes) {
-      if (candidates.some((candidate) => route.regex.test(candidate))) return route.output
+      if (candidates.some((candidate) => route.regex.test(candidate))) return route.unusable ? FAILED_OUTPUT : route.output
     }
     return null
   }
