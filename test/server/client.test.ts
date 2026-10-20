@@ -60,11 +60,11 @@ describe('createServerTakt', () => {
     expect(sentBody(calls[0]).u).toBe('https://example.com/[redacted]')
   })
 
-  it('keeps an undecodable page path when redactUndecodablePaths is false', async () => {
+  it('matches an undecodable page path leniently when redactUndecodablePaths is false', async () => {
     const { fetch, calls } = fakeFetch()
     await createServerTakt({ domain: 'example.com', redactRoutes: ['/orders/[id]'], redactUndecodablePaths: false, fetch })
       .pageview({ url: 'https://example.com/orders/%ZZ' })
-    expect(sentBody(calls[0]).u).toBe('https://example.com/orders/%ZZ')
+    expect(sentBody(calls[0]).u).toBe('https://example.com/orders/[id]')
   })
 
   it('falls back to the site home when no url is given', async () => {

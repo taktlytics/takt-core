@@ -146,7 +146,7 @@ describe('runAuto', () => {
     }
   })
 
-  it('keeps an undecodable 404 path with data-redact-undecodable-paths="false"', () => {
+  it('matches an undecodable 404 path leniently with data-redact-undecodable-paths="false"', () => {
     const marker = document.createElement('div')
     marker.setAttribute('data-takt-404', '')
     document.body.appendChild(marker)
@@ -158,7 +158,7 @@ describe('runAuto', () => {
         'data-redact-routes': '/reset/[token]',
         'data-redact-undecodable-paths': 'false',
       }))
-      expect(bodies()).toContainEqual(expect.objectContaining({ n: '404', p: { path: '/reset/%ZZ' } }))
+      expect(bodies()).toContainEqual(expect.objectContaining({ n: '404', p: { path: '/reset/[token]' } }))
     } finally {
       marker.remove()
       window.history.replaceState({}, '', 'https://example.com/')

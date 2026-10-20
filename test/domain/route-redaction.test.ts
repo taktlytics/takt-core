@@ -188,10 +188,10 @@ describe('createRouteRedaction', () => {
     expect(routes.page('https://example.com/orders/%ZZ?token=t')).toBe('https://example.com/[redacted]')
   })
 
-  it('keeps an undecodable path raw when redactUndecodablePaths is false', () => {
+  it('decodes an undecodable path leniently when redactUndecodablePaths is false', () => {
     const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: false })
-    expect(routes.path('/orders/%ZZ')).toBe('/orders/%ZZ')
-    expect(routes.page('https://example.com/orders/%ZZ?token=t')).toBe('https://example.com/orders/%ZZ?token=t')
+    expect(routes.path('/orders/%ZZ')).toBe('/orders/[id]')
+    expect(routes.page('https://example.com/orders/%ZZ?token=t')).toBe('https://example.com/orders/[id]')
     expect(routes.path('/orders/123')).toBe('/orders/[id]')
   })
 
@@ -246,5 +246,74 @@ describe('createRouteRedaction', () => {
     expect(routes.pattern('/invoices%2F991')).toBe('/invoices/[id]')
     expect(routes.pattern('/%ZZ/invoices/991')).toBe('/[redacted]')
     expect(routes.pattern('/invoices/%ZZ')).toBe('/[redacted]')
+  })
+})
+
+describe('parité takt-core-php #8', () => {
+  it.each([
+    ['/orders/[id]', '/orders%2F123', '/orders/[id]'],
+    ['/orders/[id]', '/orders%2f123', '/orders/[id]'],
+    ['/orders/[id]/items', '/orders%2F123/items', '/orders/[id]/items'],
+    ['/orders/[id]', '/Orders/123', '/orders/[id]'],
+    ['/Orders/[id]', '/orders/123', '/Orders/[id]'],
+    ['/orders/[id]', '//orders/123', '/orders/[id]'],
+    ['/orders/[id]', '/orders//123', '/orders/[id]'],
+    ['/orders/[id]', '/orders/123//', '/orders/[id]'],
+    ['/orders/[id]', '/orders%25252F123', '/orders/[id]'],
+    ['/files/[name]', '/files%252Fsecret', '/files/[name]'],
+    ['/orders/[id]', '/%25252e%25252e/orders/123', '/orders/[id]'],
+    ['/admin/[x]', '/orders/%2e%2e/admin/secret', '/admin/[x]'],
+    ['/admin/[x]', '/admin/x/../../admin/secret', '/admin/[x]'],
+    ['/orders/[id]', '/orders;a=1/123', '/orders/[id]'],
+    ['/admin/[x]', '/admin;x/secret', '/admin/[x]'],
+    ['/orders/[id]', '/a/..;/orders/123', '/orders/[id]'],
+    ['/admin/[x]', '/x/..;/admin/secret', '/admin/[x]'],
+    ['/a%20b/[x]', '/a%20b/1', '/a%20b/[x]'],
+  ])('%s matches %s as %s', (pattern, path, expected) => {
+    expect(createRouteRedaction({ redactRoutes: [pattern] }).path(path)).toBe(expected)
+  })
+
+  it.each([5, 4, 1])('matches a path encoded %i times', (times) => {
+    let encoded = '/123'
+    for (let i = 0; i < times; i++) encoded = encodeURIComponent(encoded)
+    expect(createRouteRedaction({ redactRoutes: ['/orders/[id]'] }).path('/orders' + encoded)).toBe('/orders/[id]')
+  })
+
+  it.each([true, false])('masks a path still encoded after five changes (redactUndecodablePaths %s)', (strict) => {
+    let encoded = '/123'
+    for (let i = 0; i < 6; i++) encoded = encodeURIComponent(encoded)
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: strict })
+    expect(routes.path('/orders' + encoded)).toBe('/[redacted]')
+  })
+
+  it('collapses a very long run of slashes before matching', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/verify/[token]'] })
+    expect(routes.path('/verify' + '/'.repeat(5000) + 'abc')).toBe('/verify/[token]')
+  })
+
+  it('masks an undecodable path by default, as takt-core-php does', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'] })
+    expect(routes.path('/%ZZ/orders/123')).toBe('/[redacted]')
+    expect(routes.path('/orders/%E9/123')).toBe('/[redacted]')
+    expect(routes.path('/orders/%E0%A4%A')).toBe('/[redacted]')
+    expect(routes.path('/orders/123%ZZ')).toBe('/[redacted]')
+  })
+
+  it('matches an undecodable path leniently when masking is disabled, as takt-core-php does', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: false })
+    expect(routes.path('/orders/123%ZZ')).toBe('/orders/[id]')
+    expect(routes.path('/%ZZ/orders/123')).toBe('/%ZZ/orders/123')
+    expect(routes.path('/orders/%E9/123')).toBe('/orders/%E9/123')
+  })
+
+  it('decodes valid escapes before matching when masking is disabled, even next to an undecodable one', () => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/123/[x]'], redactUndecodablePaths: false })
+    expect(routes.path('/orders/12%33/%ZZ')).toBe('/orders/123/[x]')
+    expect(createRouteRedaction({ redactRoutes: ['/orders/123/[x]'] }).path('/orders/12%33/%ZZ')).toBe('/[redacted]')
+  })
+
+  it.each([true, false])('matches a valid encoded path in both modes (redactUndecodablePaths %s)', (strict) => {
+    const routes = createRouteRedaction({ redactRoutes: ['/orders/[id]'], redactUndecodablePaths: strict })
+    expect(routes.path('/orders/%C3%A9')).toBe('/orders/[id]')
   })
 })

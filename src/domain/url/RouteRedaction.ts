@@ -41,7 +41,8 @@ const RESERVED_ESCAPES = ['23', '24', '26', '2B', '2C', '2F', '3A', '3B', '3D', 
 const ENCODED_SPLIT = /(%[0-9A-Fa-f]{2})/
 const ENCODED_TOKEN = /^%[0-9A-Fa-f]{2}$/
 const UTF8_ENCODER = new TextEncoder()
-const UTF8_DECODER = new TextDecoder('utf-8')
+const UTF8_STRICT_DECODER = new TextDecoder('utf-8', { fatal: true })
+const UTF8_LENIENT_DECODER = new TextDecoder('utf-8')
 
 function collapseSlashes(path: string): string {
   return path.replace(/\/{2,}/g, '/')
@@ -69,7 +70,18 @@ function normalizePath(path: string): string {
   return collapseSlashes(removeDotSegments(collapseSlashes(path)))
 }
 
-function decodeOnce(path: string): string | null {
+type DecodeStep = (path: string) => string | null
+
+function percentBytes(path: string, decodesEscape: (token: string) => boolean): Uint8Array {
+  const bytes = path.split(ENCODED_SPLIT).flatMap((token) =>
+    ENCODED_TOKEN.test(token) && decodesEscape(token)
+      ? [parseInt(token.slice(1), 16)]
+      : [...UTF8_ENCODER.encode(token)],
+  )
+  return Uint8Array.from(bytes)
+}
+
+function decodeStrict(path: string): string | null {
   try {
     return decodeURIComponent(path)
   } catch {
@@ -77,11 +89,15 @@ function decodeOnce(path: string): string | null {
   }
 }
 
-function decodeChain(pathname: string): string[] | null {
+function decodeLenient(path: string): string {
+  return UTF8_LENIENT_DECODER.decode(percentBytes(path, () => true))
+}
+
+function decodeChain(pathname: string, decodeStep: DecodeStep): string[] | null {
   const forms = [pathname]
   let current = pathname
   for (let changes = 0; ; changes++) {
-    const next = decodeOnce(current)
+    const next = decodeStep(current)
     if (next === null) return null
     if (next === current) return forms
     if (changes === MAX_DECODE_PASSES) return null
@@ -91,13 +107,13 @@ function decodeChain(pathname: string): string[] | null {
 }
 
 function decodeUri(path: string): string {
-  const bytes = path.split(ENCODED_SPLIT).flatMap((token) => {
-    if (!ENCODED_TOKEN.test(token) || RESERVED_ESCAPES.includes(token.slice(1).toUpperCase())) {
-      return [...UTF8_ENCODER.encode(token)]
-    }
-    return [parseInt(token.slice(1), 16)]
-  })
-  return UTF8_DECODER.decode(Uint8Array.from(bytes))
+  try {
+    return UTF8_STRICT_DECODER.decode(
+      percentBytes(path, (token) => !RESERVED_ESCAPES.includes(token.slice(1).toUpperCase())),
+    )
+  } catch {
+    return path
+  }
 }
 
 function stripMatrixParameters(path: string): string {
@@ -110,8 +126,8 @@ function stripMatrixParameters(path: string): string {
     .join('/')
 }
 
-function candidatePaths(pathname: string): string[] | null {
-  const decoded = decodeChain(pathname)
+function candidatePaths(pathname: string, decodeStep: DecodeStep): string[] | null {
+  const decoded = decodeChain(pathname, decodeStep)
   if (decoded === null) return null
   const forms = [...decoded, decodeUri(pathname)]
   return [...new Set([...forms, ...forms.map(stripMatrixParameters)].map(normalizePath))]
@@ -157,11 +173,12 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     .map((pattern) => ({ regex: compileRoute(pattern), output: canonicalRoute(pattern) }))
   const resolver = options.routeTemplates ? options.routeTemplate : undefined
   const templated = typeof resolver === 'function'
-  const maskUndecodable = options.redactUndecodablePaths !== false
+  const decodeStep: DecodeStep = options.redactUndecodablePaths === false ? decodeLenient : decodeStrict
 
   function redactedPath(pathname: string): string | null {
-    const candidates = candidatePaths(pathname)
-    if (candidates === null) return routes.length > 0 && maskUndecodable ? FAILED_OUTPUT : null
+    if (routes.length === 0) return null
+    const candidates = candidatePaths(pathname, decodeStep)
+    if (candidates === null) return FAILED_OUTPUT
     for (const route of routes) {
       if (candidates.some((candidate) => route.regex.test(candidate))) return route.output
     }
