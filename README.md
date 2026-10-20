@@ -85,7 +85,7 @@ Without `data-auto`, `takt.auto.js` behaves exactly like `takt.js`. Each extensi
 - **tagged**: add `data-takt-event="Cta"` to any clickable element; `data-takt-prop-<key>` attributes become props (empty keys/values are ignored). The reserved name `pageview` is refused. Identical to `init({ tagged: true })` on the SDK.
 - **404**: detected at load via the Navigation Timing API, or by adding `data-takt-404` to `<body>` / a `<meta name="takt:404">` tag on server-rendered error pages.
 - **data-redact-routes**: comma-separated route patterns (`data-redact-routes="/reset/[token],/verify/[token]"`), same syntax as `redactRoutes`. Applied to the pageview and SPA navigation path, the `404` path, and the `Outbound Link: Click` and `File Download` destinations (matched on their path, whatever the host). The base `takt.js` alone has no redaction: a route with a secret in its path needs `takt.auto.js` with this attribute, or the npm SDK's `redactRoutes`. When `takt.js` is loaded first, the pageview it already sent is not redacted; only navigation after `takt.auto.js` runs is masked, so load `takt.auto.js` alone on pages that carry a secret route.
-- **data-redact-undecodable-paths**: `"false"` sends a path that cannot be decoded raw instead of `/[redacted]` (default: masked when a route is configured). See [Route redaction](#route-redaction).
+- **data-redact-undecodable-paths**: `"false"` decodes a path that cannot be decoded leniently (invalid escapes kept) and matches it, instead of sending `/[redacted]` (default: masked when a route is configured). See [Route redaction](#route-redaction).
 
 ## npm
 
@@ -158,7 +158,7 @@ stopTagged()
 | `queryParams` | `string[]` | — | Allowlist: keep only these query params, drop the rest |
 | `scrubUrl` | `(url: string) => string` | — | Custom scrubber; overrides `trackQuery` / `queryParams`. Also applied to the `url` prop of outbound-link and file-download events |
 | `redactRoutes` | `string[]` | — | Route patterns whose real path is replaced by the pattern (e.g. `['/verify/[token]']` sends `/verify/[token]`). See [Route redaction](#route-redaction) |
-| `redactUndecodablePaths` | `boolean` | `true` | When a route is configured, a path that cannot be decoded is sent as `/[redacted]`; `false` sends it raw |
+| `redactUndecodablePaths` | `boolean` | `true` | When a route is configured, a path that cannot be decoded is sent as `/[redacted]`; `false` decodes it leniently and matches it, as takt-core-php does |
 | `routeTemplates` | `boolean` | `false` | Send every URL as its route template instead of the real path. Needs a `routeTemplate` resolver; the framework wrappers provide one |
 | `routeTemplate` | `() => string \| null` | — | Returns the current route template (`/blog/[slug]`, `/users/:id`). Used when `routeTemplates` is on |
 
@@ -192,7 +192,7 @@ Matching is case-insensitive: `/Orders/123` matches `/orders/[id]`.
 
 The path is decoded again and again until it stops changing, with at most five changes, so `/orders%252F123` also matches `/orders/[id]`. Each decoded form is compared. Dot segments (`.` and `..`, encoded or not) are resolved as RFC 3986 specifies, repeated slashes are collapsed, and matrix parameters (`;a=1`) are dropped from each segment before the comparison.
 
-A path that cannot be decoded (a malformed `%` escape, invalid UTF-8, or more than five changes) is sent as `/[redacted]` when at least one route is configured, so the browser never sends a path it could not check. Without a route, such a path is sent unchanged. Set `redactUndecodablePaths: false` (or `data-redact-undecodable-paths="false"` on `takt.auto.js`) to send such a path raw instead, without matching it.
+A path that cannot be decoded (a malformed `%` escape or invalid UTF-8) is sent as `/[redacted]` when at least one route is configured, so the browser never sends a path it could not check. Without a route, such a path is sent unchanged. Set `redactUndecodablePaths: false` (or `data-redact-undecodable-paths="false"` on `takt.auto.js`) to decode it leniently instead, as takt-core-php does: an invalid escape stays as written and the path is still matched against the routes. A path that still changes after five decoding passes is masked as `/[redacted]` whatever the option.
 
 When a path is masked, its query string and fragment are dropped with it, so a token in `?token=` never leaves the browser.
 
