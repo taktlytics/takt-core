@@ -125,14 +125,16 @@ describe('createRouteRedaction', () => {
       expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
     })
 
-    it('falls back to redactRoutes, then to the real path, when the router has no template', () => {
+    it('falls back to redactRoutes, then to /[redacted], when the router has no template', () => {
       const routes = createRouteRedaction({
         routeTemplates: true,
         routeTemplate: () => null,
         redactRoutes: ['/verify/[token]'],
       })
       expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
-      expect(routes.page('https://example.com/about')).toBe('https://example.com/about')
+      expect(routes.page('https://example.com/about?x=1#top')).toBe('https://example.com/[redacted]')
+      expect(routes.path('/about')).toBe('/[redacted]')
+      expect(routes.path('/verify/abc123')).toBe('/verify/[token]')
     })
 
     it('survives a resolver that throws', () => {
@@ -142,7 +144,8 @@ describe('createRouteRedaction', () => {
           throw new Error('router not ready')
         },
       })
-      expect(routes.page('https://example.com/a')).toBe('https://example.com/a')
+      expect(routes.page('https://example.com/a?x=1')).toBe('https://example.com/[redacted]')
+      expect(routes.path('/a')).toBe('/[redacted]')
     })
 
     it('reduces every referrer to its origin, since its template is unknown', () => {

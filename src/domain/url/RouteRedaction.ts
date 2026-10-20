@@ -342,10 +342,14 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     }
   }
 
+  function fallbackPath(pathname: string): string {
+    return redactedPath(pathname) ?? (templated ? REDACTED_PATH : pathname)
+  }
+
   function rewrite(raw: string, template: string | null): string {
     const url = parseUrl(raw)
     if (!url) return raw
-    const path = template ?? redactedPath(url.pathname)
+    const path = template ?? (templated ? fallbackPath(url.pathname) : redactedPath(url.pathname))
     return path === null ? raw : url.origin + path
   }
 
@@ -388,7 +392,7 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
       if (!url) return rawUrl
       return url.origin + (templated ? REDACTED_PATH : patternPath(url.pathname))
     },
-    path: (pathname) => currentTemplate() ?? (templated ? REDACTED_PATH : patternPath(pathname)),
+    path: (pathname) => currentTemplate() ?? fallbackPath(pathname),
     pattern: patternPath,
   }
 }
