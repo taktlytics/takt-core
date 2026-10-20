@@ -39,7 +39,7 @@ const RESERVED_ESCAPES = ['23', '24', '26', '2B', '2C', '2F', '3A', '3B', '3D', 
 const ENCODED_SPLIT = /(%[0-9A-Fa-f]{2})/
 const ENCODED_TOKEN = /^%[0-9A-Fa-f]{2}$/
 const UTF8_ENCODER = new TextEncoder()
-const STRICT_UTF8_DECODER = new TextDecoder('utf-8', { fatal: true })
+const UTF8_DECODER = new TextDecoder('utf-8')
 
 function collapseSlashes(path: string): string {
   return path.replace(/\/{2,}/g, '/')
@@ -78,14 +78,14 @@ function decodeOnce(path: string): string | null {
 function decodeChain(pathname: string): string[] | null {
   const forms = [pathname]
   let current = pathname
-  for (let pass = 0; pass <= MAX_DECODE_PASSES; pass++) {
+  for (let changes = 0; ; changes++) {
     const next = decodeOnce(current)
     if (next === null) return null
     if (next === current) return forms
+    if (changes === MAX_DECODE_PASSES) return null
     forms.push(next)
     current = next
   }
-  return null
 }
 
 function decodeUri(path: string): string {
@@ -95,11 +95,7 @@ function decodeUri(path: string): string {
     }
     return [parseInt(token.slice(1), 16)]
   })
-  try {
-    return STRICT_UTF8_DECODER.decode(Uint8Array.from(bytes))
-  } catch {
-    return path
-  }
+  return UTF8_DECODER.decode(Uint8Array.from(bytes))
 }
 
 function stripMatrixParameters(path: string): string {
@@ -116,7 +112,7 @@ function candidatePaths(pathname: string): string[] | null {
   const decoded = decodeChain(pathname)
   if (decoded === null) return null
   const forms = [...decoded, decodeUri(pathname)]
-  return [...forms, ...forms.map(stripMatrixParameters)].map(normalizePath)
+  return [...new Set([...forms, ...forms.map(stripMatrixParameters)].map(normalizePath))]
 }
 
 function escapeRegExp(text: string): string {
