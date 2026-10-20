@@ -410,6 +410,46 @@ describe('Analytics', () => {
       expect(calls[0].p?.url).toBe('https://partner.io/verify/[token]')
     })
 
+    it('masks the path of a same-host download in template mode', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/account' }),
+        envAt('/account'),
+        { click },
+      )
+      analytics.enableFiles(['pdf'])
+      const a = document.createElement('a')
+      a.href = 'https://example.com/download/tok123/devis-nom.pdf?sig=1'
+      trigger(a)
+      expect(calls[0]).toMatchObject({ n: 'File Download', p: { url: 'https://example.com/[redacted]' } })
+    })
+
+    it('masks the path of a download on another host of the same site in template mode', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/account' }),
+        envAt('/account'),
+        { click },
+      )
+      analytics.enableFiles(['pdf'])
+      const a = document.createElement('a')
+      a.href = 'https://cdn.example.com/download/tok123/devis-nom.pdf?sig=1'
+      trigger(a)
+      expect(calls[0]).toMatchObject({
+        n: 'File Download',
+        p: { url: 'https://cdn.example.com/[redacted]', extension: 'pdf' },
+      })
+    })
+
+    it('reduces a referrer from another host of the same site in template mode', () => {
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/users/[id]' }),
+        envAt('/users/42', 'https://www.example.com/private/path?x=1'),
+      )
+      analytics.pageview()
+      expect(calls[0].r).toBe('https://www.example.com/')
+    })
+
     it('keeps the outbound destination pattern-only in template mode', () => {
       const { click, trigger } = fakeClick()
       const { analytics, calls } = makeWithRoutes(
@@ -443,7 +483,7 @@ describe('Analytics', () => {
       }
     })
 
-    it('falls back to the redactRoutes pattern on a 404 when the resolver returns nothing', () => {
+    it('sends the redactRoutes pattern on a 404 in template mode when the resolver returns nothing', () => {
       const marker = document.createElement('div')
       marker.setAttribute('data-takt-404', '')
       document.body.appendChild(marker)
@@ -454,6 +494,97 @@ describe('Analytics', () => {
           createRouteRedaction({
             redactRoutes: ['/verify/[token]'],
             routeTemplates: true,
+            routeTemplate: () => null,
+          }),
+          envAt('/verify/abc123'),
+        )
+        analytics.enable404()
+        expect(calls[0]).toMatchObject({ n: '404', p: { path: '/verify/[token]' } })
+      } finally {
+        marker.remove()
+        history.replaceState(null, '', previous)
+      }
+    })
+
+    function enable404At(path: string, routes: ReturnType<typeof createRouteRedaction>) {
+      const marker = document.createElement('div')
+      marker.setAttribute('data-takt-404', '')
+      document.body.appendChild(marker)
+      const previous = location.pathname
+      history.replaceState(null, '', path)
+      try {
+        const { analytics, calls } = makeWithRoutes(routes, envAt(path))
+        analytics.enable404()
+        return calls[0]
+      } finally {
+        marker.remove()
+        history.replaceState(null, '', previous)
+      }
+    }
+
+    it('sends the resolved template as the pageview and 404 url and path', () => {
+      const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/invite/[code]' })
+      const { analytics, calls } = makeWithRoutes(routes, envAt('/invite/s3cr3t'))
+      analytics.pageview()
+      expect(calls[0]).toMatchObject({ u: 'https://example.com/invite/[code]' })
+      expect(enable404At('/invite/s3cr3t', routes)).toMatchObject({
+        n: '404',
+        u: 'https://example.com/invite/[code]',
+        p: { path: '/invite/[code]' },
+      })
+    })
+
+    it('sends the redactRoutes pattern as the pageview and 404 url and path when the resolver returns nothing', () => {
+      const routes = createRouteRedaction({
+        redactRoutes: ['/reset/[token]'],
+        routeTemplates: true,
+        routeTemplate: () => null,
+      })
+      const { analytics, calls } = makeWithRoutes(routes, envAt('/reset/abc?x=1'))
+      analytics.pageview()
+      expect(calls[0]).toMatchObject({ u: 'https://example.com/reset/[token]' })
+      expect(enable404At('/reset/abc', routes)).toMatchObject({
+        n: '404',
+        u: 'https://example.com/reset/[token]',
+        p: { path: '/reset/[token]' },
+      })
+    })
+
+    it('sends /[redacted] as the pageview and 404 url and path when neither the resolver nor redactRoutes covers the page', () => {
+      const routes = createRouteRedaction({
+        redactRoutes: ['/reset/[token]'],
+        routeTemplates: true,
+        routeTemplate: () => null,
+      })
+      const { analytics, calls } = makeWithRoutes(routes, envAt('/account/tok123?x=1#top'))
+      analytics.pageview()
+      expect(calls[0]).toMatchObject({ u: 'https://example.com/[redacted]' })
+      expect(enable404At('/account/tok123', routes)).toMatchObject({
+        n: '404',
+        u: 'https://example.com/[redacted]',
+        p: { path: '/[redacted]' },
+      })
+    })
+
+    it('keeps the real pageview url and 404 path outside template mode when no route covers the page', () => {
+      const routes = createRouteRedaction({ redactRoutes: ['/reset/[token]'], routeTemplate: () => null })
+      const { analytics, calls } = makeWithRoutes(routes, envAt('/about?x=1'))
+      analytics.pageview()
+      expect(calls[0]).toMatchObject({ u: 'https://example.com/about' })
+      expect(enable404At('/about', routes)).toMatchObject({ n: '404', p: { path: '/about' } })
+    })
+
+    it('applies the redactRoutes pattern on a 404 outside template mode when no template is resolved', () => {
+      const marker = document.createElement('div')
+      marker.setAttribute('data-takt-404', '')
+      document.body.appendChild(marker)
+      const previous = location.pathname
+      history.replaceState(null, '', '/verify/abc123')
+      try {
+        const { analytics, calls } = makeWithRoutes(
+          createRouteRedaction({
+            redactRoutes: ['/verify/[token]'],
+            routeTemplates: false,
             routeTemplate: () => null,
           }),
           envAt('/verify/abc123'),

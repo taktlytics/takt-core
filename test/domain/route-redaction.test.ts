@@ -104,6 +104,14 @@ describe('createRouteRedaction', () => {
       expect(routes.referrer('', PAGE)).toBe('')
     })
 
+    it('applies the patterns to a destination, on the page host or another one', () => {
+      const routes = createRouteRedaction({ redactRoutes: ['/invoices/[id]'] })
+      expect(routes.outboundDestination('https://example.com/invoices/991', PAGE)).toBe('https://example.com/invoices/[id]')
+      expect(routes.outboundDestination('https://cdn.io/invoices/991', PAGE)).toBe('https://cdn.io/invoices/[id]')
+      expect(routes.downloadDestination('https://example.com/invoices/991.pdf')).toBe('https://example.com/invoices/[id]')
+      expect(routes.downloadDestination('https://cdn.io/invoices/991')).toBe('https://cdn.io/invoices/[id]')
+    })
+
     it('ignores blank patterns', () => {
       const routes = createRouteRedaction({ redactRoutes: ['', '  '] })
       expect(routes.path('/anything')).toBe('/anything')
@@ -117,14 +125,16 @@ describe('createRouteRedaction', () => {
       expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
     })
 
-    it('falls back to redactRoutes, then to the real path, when the router has no template', () => {
+    it('falls back to redactRoutes, then to /[redacted], when the router has no template', () => {
       const routes = createRouteRedaction({
         routeTemplates: true,
         routeTemplate: () => null,
         redactRoutes: ['/verify/[token]'],
       })
       expect(routes.page(PAGE)).toBe('https://example.com/verify/[token]')
-      expect(routes.page('https://example.com/about')).toBe('https://example.com/about')
+      expect(routes.page('https://example.com/about?x=1#top')).toBe('https://example.com/[redacted]')
+      expect(routes.path('/about')).toBe('/[redacted]')
+      expect(routes.path('/verify/abc123')).toBe('/verify/[token]')
     })
 
     it('survives a resolver that throws', () => {
@@ -134,13 +144,46 @@ describe('createRouteRedaction', () => {
           throw new Error('router not ready')
         },
       })
-      expect(routes.page('https://example.com/a')).toBe('https://example.com/a')
+      expect(routes.page('https://example.com/a?x=1')).toBe('https://example.com/[redacted]')
+      expect(routes.path('/a')).toBe('/[redacted]')
     })
 
-    it('drops the path of a same-origin referrer, whose template is unknown', () => {
+    it('reduces every referrer to its origin, since its template is unknown', () => {
       const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/x' })
       expect(routes.referrer('https://example.com/verify/abc?x=1', PAGE)).toBe('https://example.com/')
-      expect(routes.referrer('https://google.com/search', PAGE)).toBe('https://google.com/search')
+      expect(routes.referrer('https://www.example.com/verify/abc', PAGE)).toBe('https://www.example.com/')
+      expect(routes.referrer('https://google.com/search', PAGE)).toBe('https://google.com/')
+      expect(routes.referrer('android-app://com.example.app/verify/abc', PAGE)).toBe('')
+      expect(routes.referrer('', PAGE)).toBe('')
+    })
+
+    it('masks a download whatever its host, and never uses the template', () => {
+      const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/download/[token]/[file]' })
+      expect(routes.downloadDestination('https://example.com/download/tok123/devis-nom.pdf?sig=1')).toBe(
+        'https://example.com/[redacted]',
+      )
+      expect(routes.downloadDestination('https://cdn.io/download/tok123/devis.pdf')).toBe('https://cdn.io/[redacted]')
+    })
+
+    it('masks an outbound link on the page host, and keeps the path of one on another host', () => {
+      const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/x' })
+      expect(routes.outboundDestination('https://example.com/download/tok123', PAGE)).toBe(
+        'https://example.com/[redacted]',
+      )
+      expect(routes.outboundDestination('https://partner.io/users/42', PAGE)).toBe('https://partner.io/users/42')
+      expect(routes.outboundDestination('https://www.example.com/download/tok123', PAGE)).toBe(
+        'https://www.example.com/download/tok123',
+      )
+    })
+
+    it('masks an outbound link on the page host whatever the trailing dot of either host', () => {
+      const routes = createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/x' })
+      expect(routes.outboundDestination('https://example.com./download/tok123', PAGE)).toBe(
+        'https://example.com./[redacted]',
+      )
+      expect(routes.outboundDestination('https://example.com/download/tok123', 'https://example.com./verify/abc')).toBe(
+        'https://example.com/[redacted]',
+      )
     })
 
     it('stays off without a resolver or when the flag is false', () => {
