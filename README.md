@@ -186,6 +186,8 @@ createTakt({ redactRoutes: ['/verify/[token]', '/reset/:code', '/invoices/[id].p
 
 `redactRoutes` lists the sensitive routes. A matching path is sent as the pattern (`/verify/[token]`), every other path keeps its real value, so per-page stats stay intact. Patterns accept SvelteKit / Astro / Next syntax (`[param]`, `[[optional]]`, `[...rest]`, `(group)`) and Vue / React / Angular / Solid syntax (`:param`, `:param?`, `*`, `**`). The rule covers the page URL, same-origin referrers, outbound link destinations and download links (matched on their path, whatever the host), and 404 paths.
 
+Matching is case-insensitive: `/Orders/123` matches `/orders/[id]`. The path is decoded again and again until it stops changing (at most five passes, so `/orders%252F123` also matches `/orders/[id]`). Each decoded form is compared, and dot segments (`.` and `..`, encoded or not) are resolved as RFC 3986 specifies, repeated slashes are collapsed, and matrix parameters (`;a=1`) are dropped from each segment before the comparison. A path that cannot be decoded (a malformed `%` escape, invalid UTF-8, or more encoding levels than the five passes) is sent as `/[redacted]` when at least one route is configured, so the browser never sends a path it could not check. Without a route, such a path is sent unchanged. When a path is masked, its query string and fragment are dropped with it, so a token in `?token=` never leaves the browser.
+
 ```ts
 createTakt({ routeTemplates: true, routeTemplate: () => currentRoute.id })
 ```
