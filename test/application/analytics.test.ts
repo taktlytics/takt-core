@@ -424,6 +424,23 @@ describe('Analytics', () => {
       expect(calls[0]).toMatchObject({ n: 'File Download', p: { url: 'https://example.com/[redacted]' } })
     })
 
+    it('masks the path of a download on another host of the same site in template mode', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/account' }),
+        envAt('/account'),
+        { click },
+      )
+      analytics.enableFiles(['pdf'])
+      const a = document.createElement('a')
+      a.href = 'https://cdn.example.com/download/tok123/devis-nom.pdf?sig=1'
+      trigger(a)
+      expect(calls[0]).toMatchObject({
+        n: 'File Download',
+        p: { url: 'https://cdn.example.com/[redacted]', extension: 'pdf' },
+      })
+    })
+
     it('reduces a referrer from another host of the same site in template mode', () => {
       const { analytics, calls } = makeWithRoutes(
         createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/users/[id]' }),

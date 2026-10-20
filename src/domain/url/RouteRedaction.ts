@@ -14,7 +14,8 @@ export interface RouteRedaction {
   page(rawUrl: string): string
   link(rawUrl: string, pageUrl: string): string
   referrer(rawUrl: string, pageUrl: string): string
-  destination(rawUrl: string, pageUrl: string): string
+  outboundDestination(rawUrl: string, pageUrl: string): string
+  downloadDestination(rawUrl: string): string
   path(pathname: string): string
   pattern(pathname: string): string
 }
@@ -372,11 +373,15 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
       if (!url) return rawUrl
       return routes.length ? rewrite(rawUrl, null) : rawUrl
     },
-    destination(rawUrl, pageUrl) {
+    outboundDestination(rawUrl, pageUrl) {
       const url = parseUrl(rawUrl)
       if (!url) return rawUrl
-      if (templated && sameHost(url, pageUrl)) return url.origin + REDACTED_PATH
-      return url.origin + patternPath(url.pathname)
+      return url.origin + (templated && sameHost(url, pageUrl) ? REDACTED_PATH : patternPath(url.pathname))
+    },
+    downloadDestination(rawUrl) {
+      const url = parseUrl(rawUrl)
+      if (!url) return rawUrl
+      return url.origin + (templated ? REDACTED_PATH : patternPath(url.pathname))
     },
     path: (pathname) => currentTemplate() ?? patternPath(pathname),
     pattern: patternPath,

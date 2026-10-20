@@ -105,12 +105,8 @@ export class Analytics {
       this.clickSource,
       this.envProvider,
       (name, opts) => this.track(name, opts),
-      (destination) => this.config.scrubUrl(this._redactDestination(destination)),
+      (destination) => this.config.scrubUrl(this.routes.outboundDestination(destination, this.envProvider.url())),
     ).enable()
-  }
-
-  private _redactDestination(destination: string): string {
-    return this.routes.destination(destination, this.envProvider.url())
   }
 
   enableFiles(extensions?: string[]): () => void {
@@ -118,7 +114,7 @@ export class Analytics {
       this.clickSource,
       (name, opts) => this.track(name, opts),
       extensions,
-      (destination) => this.config.scrubUrl(this._redactDestination(destination)),
+      (destination) => this.config.scrubUrl(this.routes.downloadDestination(destination)),
     ).enable()
   }
 
