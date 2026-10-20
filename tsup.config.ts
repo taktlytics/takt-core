@@ -12,16 +12,14 @@ export default defineConfig([
   {
     entry: { takt: 'src/composition/snippet.iife.ts' },
     format: ['iife'],
-    globalName: 'takt',
     outExtension: () => ({ js: '.js' }),
     minify: true,
     sourcemap: true,
     treeshake: true,
   },
   {
-    entry: { 'takt.auto': 'src/composition/auto.ts' },
+    entry: { 'takt.auto': 'src/composition/auto.iife.ts' },
     format: ['iife'],
-    globalName: 'takt',
     outExtension: () => ({ js: '.js' }),
     minify: true,
     sourcemap: true,
