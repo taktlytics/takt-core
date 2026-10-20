@@ -23,7 +23,7 @@ const PARAM = /\[[^\]]+\]|:\w+(\([^)]*\))?|\{\w+(<[^>]*>)?(\?[^}]*)?\}/g
 const BRACE = /\{(\w+)(<[^>]*>)?(\?[^}]*)?\}/g
 
 function routeSegments(template: string): string[] {
-  return template.split(/\/(?![^<]*>)/).filter((segment) => segment !== '' && !GROUP.test(segment))
+  return template.split(/(?<!<[^>]*)\//).filter((segment) => segment !== '' && !GROUP.test(segment))
 }
 
 function canonicalSegment(segment: string): string {

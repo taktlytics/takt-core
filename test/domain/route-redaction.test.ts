@@ -339,6 +339,13 @@ describe('parité takt-core-php #8', () => {
   })
 })
 
+describe('segment split with a literal >', () => {
+  it('still splits the slashes after a > that has no <', () => {
+    const redaction = createRouteRedaction({ redactRoutes: ['/a>b/[...rest]'] })
+    expect(redaction.path('/a>b/x/y')).toBe('/a>b/[...rest]')
+  })
+})
+
 describe('brace constraints', () => {
   const masks = (pattern: string, path: string) => createRouteRedaction({ redactRoutes: [pattern] }).path(path)
 
