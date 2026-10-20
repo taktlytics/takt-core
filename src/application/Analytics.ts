@@ -110,8 +110,7 @@ export class Analytics {
   }
 
   private _redactDestination(destination: string): string {
-    const url = new URL(destination)
-    return url.origin + this.routes.pattern(url.pathname)
+    return this.routes.destination(destination, this.envProvider.url())
   }
 
   enableFiles(extensions?: string[]): () => void {

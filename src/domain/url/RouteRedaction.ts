@@ -14,6 +14,7 @@ export interface RouteRedaction {
   page(rawUrl: string): string
   link(rawUrl: string, pageUrl: string): string
   referrer(rawUrl: string, pageUrl: string): string
+  destination(rawUrl: string, pageUrl: string): string
   path(pathname: string): string
   pattern(pathname: string): string
 }
@@ -39,7 +40,8 @@ export function canonicalRoute(template: string): string {
 }
 
 const MAX_DECODE_PASSES = 5
-const FAILED_OUTPUT = '/[redacted]'
+const REDACTED_PATH = '/[redacted]'
+const HTTP_PROTOCOLS = ['http:', 'https:']
 const RESERVED_ESCAPES = ['23', '24', '26', '2B', '2C', '2F', '3A', '3B', '3D', '3F', '40']
 const ENCODED_SPLIT = /(%[0-9A-Fa-f]{2})/
 const ENCODED_TOKEN = /^%[0-9A-Fa-f]{2}$/
@@ -313,12 +315,16 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
   function redactedPath(pathname: string): string | null {
     if (routes.length === 0) return null
     const candidates = candidatePaths(pathname, mode)
-    if (candidates === null) return FAILED_OUTPUT
+    if (candidates === null) return REDACTED_PATH
     for (const route of routes) {
-      if (candidates.some((candidate) => hasOverlongConstrainedSegment(route, candidate))) return FAILED_OUTPUT
-      if (candidates.some((candidate) => route.regex.test(candidate))) return route.unusable ? FAILED_OUTPUT : route.output
+      if (candidates.some((candidate) => hasOverlongConstrainedSegment(route, candidate))) return REDACTED_PATH
+      if (candidates.some((candidate) => route.regex.test(candidate))) return route.unusable ? REDACTED_PATH : route.output
     }
     return null
+  }
+
+  function patternPath(pathname: string): string {
+    return redactedPath(pathname) ?? pathname
   }
 
   function currentTemplate(): string | null {
@@ -344,6 +350,15 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     return url && page && url.origin === page.origin ? url : null
   }
 
+  function sameHost(url: URL, pageUrl: string): boolean {
+    return parseUrl(pageUrl)?.hostname === url.hostname
+  }
+
+  function siteRoot(raw: string): string {
+    const url = parseUrl(raw)
+    return url && HTTP_PROTOCOLS.includes(url.protocol) ? url.origin + '/' : ''
+  }
+
   return {
     templated,
     page: (rawUrl) => (templated || routes.length ? rewrite(rawUrl, currentTemplate()) : rawUrl),
@@ -352,12 +367,18 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
       return rewrite(rawUrl, null)
     },
     referrer(rawUrl, pageUrl) {
+      if (templated) return siteRoot(rawUrl)
       const url = sameOrigin(rawUrl, pageUrl)
       if (!url) return rawUrl
-      if (templated) return url.origin + '/'
       return routes.length ? rewrite(rawUrl, null) : rawUrl
     },
-    path: (pathname) => currentTemplate() ?? redactedPath(pathname) ?? pathname,
-    pattern: (pathname) => redactedPath(pathname) ?? pathname,
+    destination(rawUrl, pageUrl) {
+      const url = parseUrl(rawUrl)
+      if (!url) return rawUrl
+      if (templated && sameHost(url, pageUrl)) return url.origin + REDACTED_PATH
+      return url.origin + patternPath(url.pathname)
+    },
+    path: (pathname) => currentTemplate() ?? patternPath(pathname),
+    pattern: patternPath,
   }
 }

@@ -410,6 +410,29 @@ describe('Analytics', () => {
       expect(calls[0].p?.url).toBe('https://partner.io/verify/[token]')
     })
 
+    it('masks the path of a same-host download in template mode', () => {
+      const { click, trigger } = fakeClick()
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/account' }),
+        envAt('/account'),
+        { click },
+      )
+      analytics.enableFiles(['pdf'])
+      const a = document.createElement('a')
+      a.href = 'https://example.com/download/tok123/devis-nom.pdf?sig=1'
+      trigger(a)
+      expect(calls[0]).toMatchObject({ n: 'File Download', p: { url: 'https://example.com/[redacted]' } })
+    })
+
+    it('reduces a referrer from another host of the same site in template mode', () => {
+      const { analytics, calls } = makeWithRoutes(
+        createRouteRedaction({ routeTemplates: true, routeTemplate: () => '/users/[id]' }),
+        envAt('/users/42', 'https://www.example.com/private/path?x=1'),
+      )
+      analytics.pageview()
+      expect(calls[0].r).toBe('https://www.example.com/')
+    })
+
     it('keeps the outbound destination pattern-only in template mode', () => {
       const { click, trigger } = fakeClick()
       const { analytics, calls } = makeWithRoutes(
