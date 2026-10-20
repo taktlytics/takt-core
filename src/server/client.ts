@@ -16,6 +16,7 @@ export interface ServerTaktOptions {
   queryParams?: string[]
   scrubUrl?: UrlScrubber
   redactRoutes?: string[]
+  redactUndecodablePaths?: boolean
   strict?: boolean
   fetch?: typeof globalThis.fetch
 }
@@ -54,11 +55,12 @@ export function createServerTakt(options: ServerTaktOptions): ServerTakt {
     custom: options.scrubUrl,
   })
   const send = options.fetch ?? globalThis.fetch
-  const routes = createRouteRedaction({ redactRoutes: options.redactRoutes })
+  const redaction = { redactRoutes: options.redactRoutes, redactUndecodablePaths: options.redactUndecodablePaths }
+  const routes = createRouteRedaction(redaction)
 
   function routesFor(route: string | undefined) {
     if (!route?.trim()) return routes
-    return createRouteRedaction({ redactRoutes: options.redactRoutes, routeTemplates: true, routeTemplate: () => route })
+    return createRouteRedaction({ ...redaction, routeTemplates: true, routeTemplate: () => route })
   }
 
   async function post(event: AnalyticsEvent, opts: ServerPageviewOptions): Promise<void> {
@@ -95,8 +97,6 @@ export function createServerTakt(options: ServerTaktOptions): ServerTakt {
   }
 }
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
-
 function assertTransportSecure(endpoint: string): void {
   let url: URL
   try {
@@ -104,10 +104,8 @@ function assertTransportSecure(endpoint: string): void {
   } catch {
     return
   }
-  if (url.protocol === 'http:' && !LOOPBACK_HOSTS.has(url.hostname)) {
-    throw new Error(
-      `createServerTakt: endpoint ${url.origin} must use https (http is only accepted for localhost, 127.0.0.1 and [::1])`,
-    )
+  if (url.protocol === 'http:') {
+    throw new Error(`createServerTakt: endpoint ${url.origin} must use https`)
   }
 }
 
