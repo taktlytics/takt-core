@@ -195,6 +195,52 @@ describe('bornes par route et par segment', () => {
     expect(mask('/x/{a}{b}', '/x/ab')).toBe('/x/{a}{b}')
   })
 
+  it('rejette deux segments à deux paramètres non contraints (degré 2)', () => {
+    expect(mask('/{a}{b}/{c}{d}', '/aa/bb')).toBe('/[redacted]')
+  })
+
+  it('accepte un segment à deux paramètres suivi d un paramètre simple (degré 1)', () => {
+    expect(mask('/{a}{b}/{c}', '/ab/c')).toBe('/{a}{b}/{c}')
+  })
+
+  it('rejette un segment à deux quantificateurs contraints suivi d un segment à deux paramètres', () => {
+    expect(mask('/{p<a*a*>}/{q}{r}', '/aa/bb')).toBe('/[redacted]')
+  })
+
+  it('compte le paramètre optionnel {x?} dans le degré', () => {
+    expect(mask('/{a?}/{b}{c}', '/x/yz')).toBe('/[redacted]')
+    expect(mask('/{a?}/{b}', '/x/y')).toBe('/{a}/{b}')
+  })
+
+  it('le degré borne le temps sur plusieurs segments : 4 segments de 80 octets qui échouent, sous 50 ms', () => {
+    const segment = 'a'.repeat(80)
+    const path = `/${segment}/${segment}/${segment}/${segment}/y`
+    const started = performance.now()
+    expect(mask('/{a}{b}/{a}{b}/{a}{b}/{a}{b}/x', path)).toBe(path)
+    expect(performance.now() - started).toBeLessThan(BUDGET_MS)
+  })
+
+  it('rejette deux segments REST dans une route, rapidement', () => {
+    const path = `/${'a/'.repeat(200)}c`
+    const started = performance.now()
+    expect(mask('/**/a/**/a/**/a/**/b/x', path)).toBe(path)
+    expect(mask('/**/a/**/a/**/a/**/b', `/${'a/'.repeat(200)}b`)).toBe('/[redacted]')
+    expect(performance.now() - started).toBeLessThan(BUDGET_MS)
+  })
+
+  it('accepte un seul segment REST', () => {
+    expect(mask('/**/x', '/a/b/x')).toBe('/*/x')
+  })
+
+  it('pire cas accepté sur plusieurs segments : degré 1 et segments à 255 octets, sous 50 ms', () => {
+    const segment = 'a'.repeat(255)
+    const started = performance.now()
+    expect(mask('/{p<a*a*>}/{q}/{r}/x', `/${segment}/${segment}/${segment}/x`)).toBe('/{p}/{q}/{r}/x')
+    expect(mask('/{a}{b}/{c<a*>}/{d<a*>}/x', `/${segment}/${segment}/${segment}/x`)).toBe('/{a}{b}/{c}/{d}/x')
+    expect(mask('/{p<a*a*>}/{q}/{r}/x', `/${segment}/${segment}/${segment}/y`)).toBe(`/${segment}/${segment}/${segment}/y`)
+    expect(performance.now() - started).toBeLessThan(BUDGET_MS)
+  })
+
   it('pire cas accepté : 2 quantificateurs variables sur 256 octets, sous 50 ms', () => {
     const start = performance.now()
     expect(mask('/x/{a<\\w*\\w*>}', `/x/${LONG}`)).toBe(`/x/${LONG}`)
@@ -250,6 +296,10 @@ describe('forme des routes inutilisables', () => {
     ['a\u0001'],
   ])('une contrainte invalide %s rend la route entière inutilisable', (constraint) => {
     expect(mask(`/x/{p<\\d>}/{q<${constraint}>}`, '/x/abc/q')).toBe('/[redacted]')
+  })
+
+  it('lenient : %FF est un octet brut, donc . le matche et la route masque en gabarit', () => {
+    expect(createRouteRedaction({ redactRoutes: ['/x/{p<.>}'], redactUndecodablePaths: false }).path('/x/%FF')).toBe('/x/{p}')
   })
 
   it('. se compile en [^/] : le saut de ligne est un octet ordinaire', () => {

@@ -45,7 +45,6 @@ const ENCODED_SPLIT = /(%[0-9A-Fa-f]{2})/
 const ENCODED_TOKEN = /^%[0-9A-Fa-f]{2}$/
 const UTF8_ENCODER = new TextEncoder()
 const UTF8_STRICT_DECODER = new TextDecoder('utf-8', { fatal: true })
-const UTF8_LENIENT_DECODER = new TextDecoder('utf-8')
 
 function collapseSlashes(path: string): string {
   return path.replace(/\/{2,}/g, '/')
@@ -92,13 +91,22 @@ function decodeStrict(path: string): string | null {
   }
 }
 
-function decodeLenient(path: string): string {
-  return UTF8_LENIENT_DECODER.decode(percentBytes(path, () => true))
+function byteValues(form: string): number[] {
+  return [...form].flatMap((char) => {
+    const code = char.charCodeAt(0)
+    return code >= BYTE_OFFSET && code < BYTE_OFFSET + 0x100 ? [code - BYTE_OFFSET] : [...UTF8_ENCODER.encode(char)]
+  })
 }
 
-function decodeChain(pathname: string, decodeStep: DecodeStep): string[] | null {
-  const forms = [pathname]
-  let current = pathname
+function decodeLenient(form: string): string {
+  return byteString(
+    form.split(ENCODED_SPLIT).flatMap((token) => (ENCODED_TOKEN.test(token) ? [parseInt(token.slice(1), 16)] : byteValues(token))),
+  )
+}
+
+function decodeChain(start: string, decodeStep: DecodeStep): string[] | null {
+  const forms = [start]
+  let current = start
   for (let changes = 0; ; changes++) {
     const next = decodeStep(current)
     if (next === null) return null
@@ -129,10 +137,19 @@ function stripMatrixParameters(path: string): string {
     .join('/')
 }
 
-function candidatePaths(pathname: string, decodeStep: DecodeStep): string[] | null {
-  const decoded = decodeChain(pathname, decodeStep)
+interface DecodingMode {
+  decode: DecodeStep
+  toForm: (pathname: string) => string
+  toCandidate: (form: string) => string
+}
+
+const STRICT_MODE: DecodingMode = { decode: decodeStrict, toForm: (pathname) => pathname, toCandidate: toByteString }
+const LENIENT_MODE: DecodingMode = { decode: decodeLenient, toForm: toByteString, toCandidate: (form) => form }
+
+function candidatePaths(pathname: string, mode: DecodingMode): string[] | null {
+  const decoded = decodeChain(mode.toForm(pathname), mode.decode)
   if (decoded === null) return null
-  const forms = [...decoded, decodeUri(pathname)]
+  const forms = [...decoded.map(mode.toCandidate), toByteString(decodeUri(pathname))]
   return [...new Set([...forms, ...forms.map(stripMatrixParameters)].map(normalizePath))]
 }
 
@@ -150,10 +167,27 @@ const encoder = new TextEncoder()
 interface BuildState {
   unusable: boolean
   variables: number
+  degree: number
+  rest: number
+}
+
+const MAX_ROUTE_DEGREE = 1
+const MAX_ROUTE_REST_SEGMENTS = 1
+
+function freshState(): BuildState {
+  return { unusable: false, variables: 0, degree: 0, rest: 0 }
+}
+
+function segmentDegree(variables: number): number {
+  return Math.max(0, variables - 1)
+}
+
+function byteString(bytes: ArrayLike<number>): string {
+  return Array.from(bytes, (byte) => String.fromCharCode(byte < 0x80 ? byte : BYTE_OFFSET + byte)).join('')
 }
 
 function toByteString(text: string): string {
-  return Array.from(encoder.encode(text), (byte) => String.fromCharCode(byte < 0x80 ? byte : BYTE_OFFSET + byte)).join('')
+  return byteString(encoder.encode(text))
 }
 
 function constraintBody(param: string): string | undefined {
@@ -195,6 +229,7 @@ function segmentSource(segment: string, mode: BuildMode, state: BuildState): str
     state.unusable = true
     return '[^/]+'
   }
+  state.degree += segmentDegree(variables)
   let source = ''
   let last = 0
   params.forEach((param, index) => {
@@ -204,11 +239,26 @@ function segmentSource(segment: string, mode: BuildMode, state: BuildState): str
   return source + escapeRegExp(toByteString(segment.slice(last)))
 }
 
+function shapeSegments(segments: string[]): string[] {
+  const isRest = segments.map((segment) => REST.test(segment))
+  const first = isRest.indexOf(true)
+  if (first === -1) return segments
+  const last = isRest.lastIndexOf(true)
+  return [...segments.slice(0, first), '**', ...segments.slice(last + 1)]
+}
+
 function buildSource(segments: string[], mode: BuildMode, state: BuildState): string {
   return segments
     .map((segment) => {
-      if (REST.test(segment)) return '(?:/.*)?'
-      if (OPTIONAL.test(segment)) return `(?:/${paramSource(segment, mode, state).source})?`
+      if (REST.test(segment)) {
+        state.rest += 1
+        return '(?:/.*)?'
+      }
+      if (OPTIONAL.test(segment)) {
+        const piece = paramSource(segment, mode, state)
+        if (mode !== 'shape') state.degree += segmentDegree(piece.variables + 1)
+        return `(?:/${piece.source})?`
+      }
       return '/' + segmentSource(segment, mode, state)
     })
     .join('')
@@ -222,14 +272,18 @@ interface CompiledRoute {
 
 function compileRoute(pattern: string): CompiledRoute {
   const segments = routeSegments(pattern)
-  const state: BuildState = { unusable: false, variables: 0 }
+  const state = freshState()
   const source = buildSource(segments, 'strict', state)
-  const loose = buildSource(segments, 'loose', { unusable: false, variables: 0 })
-  const shape = buildSource(segments, 'shape', { unusable: false, variables: 0 })
-  const unusable = state.unusable || state.variables > MAX_ROUTE_VARIABLE_QUANTIFIERS
+  const loose = buildSource(segments, 'loose', freshState())
+  const shape = buildSource(shapeSegments(segments), 'shape', freshState())
+  const unusable =
+    state.unusable ||
+    state.variables > MAX_ROUTE_VARIABLE_QUANTIFIERS ||
+    state.degree > MAX_ROUTE_DEGREE ||
+    state.rest > MAX_ROUTE_REST_SEGMENTS
   return {
     regex: new RegExp(`^${unusable ? shape : source}/?$`, 'i'),
-    loose: new RegExp(`^${loose}/?$`, 'i'),
+    loose: new RegExp(`^${unusable ? shape : loose}/?$`, 'i'),
     unusable,
   }
 }
@@ -254,13 +308,12 @@ export default function createRouteRedaction(options: RouteRedactionOptions = {}
     .map((pattern) => ({ ...compileRoute(pattern), output: canonicalRoute(pattern) }))
   const resolver = options.routeTemplates ? options.routeTemplate : undefined
   const templated = typeof resolver === 'function'
-  const decodeStep: DecodeStep = options.redactUndecodablePaths === false ? decodeLenient : decodeStrict
+  const mode = options.redactUndecodablePaths === false ? LENIENT_MODE : STRICT_MODE
 
   function redactedPath(pathname: string): string | null {
     if (routes.length === 0) return null
-    const decoded = candidatePaths(pathname, decodeStep)
-    if (decoded === null) return FAILED_OUTPUT
-    const candidates = decoded.map(toByteString)
+    const candidates = candidatePaths(pathname, mode)
+    if (candidates === null) return FAILED_OUTPUT
     for (const route of routes) {
       if (candidates.some((candidate) => hasOverlongConstrainedSegment(route, candidate))) return FAILED_OUTPUT
       if (candidates.some((candidate) => route.regex.test(candidate))) return route.unusable ? FAILED_OUTPUT : route.output
