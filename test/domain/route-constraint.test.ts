@@ -66,6 +66,7 @@ describe('grammaire des contraintes : rejet fail-closed', () => {
     'a\\',
     'a<b',
     '.{1}*',
+    '[z-a]',
     '[\\d-z]',
     '[a-\\d]',
     '[--a]',
