@@ -7,7 +7,7 @@ import { DEFAULT_DOWNLOAD_EXTENSIONS } from '../../src/domain/download/defaultEx
 
 const PROBES = [
   ...DEFAULT_DOWNLOAD_EXTENSIONS,
-  'doc', 'ppt', 'html', 'htm', 'js', 'json', 'xml', 'css', 'php', 'ico', 'png', 'jpg', 'jpeg', 'webp', 'svg',
+  'html', 'htm', 'js', 'json', 'xml', 'css', 'php', 'ico', 'png', 'jpg', 'jpeg', 'webp', 'svg',
   'bin', 'iso', 'msi', 'pkg', 'deb', 'rpm', 'epub', 'tar', 'bz2', 'xz', 'webm', 'ogg', 'flac',
   'm4a', 'odt', 'ods', 'odp', 'rtf',
 ]
@@ -76,7 +76,12 @@ describe('parité des extensions de téléchargement par défaut', () => {
       .map((b) => b.p!.url.slice(b.p!.url.lastIndexOf('.') + 1))
 
     const expected = PROBES.filter((ext) => DEFAULT_DOWNLOAD_EXTENSIONS.includes(ext))
+    const sdkEmitted = sdkEmittedExtensions()
     expect(autoEmitted.sort()).toEqual([...expected].sort())
-    expect(sdkEmittedExtensions().sort()).toEqual([...expected].sort())
+    expect(sdkEmitted.sort()).toEqual([...expected].sort())
+    for (const ext of ['doc', 'ppt']) {
+      expect(autoEmitted).toContain(ext)
+      expect(sdkEmitted).toContain(ext)
+    }
   })
 })
